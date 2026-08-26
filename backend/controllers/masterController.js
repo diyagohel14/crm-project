@@ -1546,7 +1546,7 @@ export async function viewCrDrReasonList(req, res) {
     const { companyId } = req.session.user;
     const companyPool = await getCompanyPool(companyId);
     try {
-        const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE is_deleted=FALSE`);
+        const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE company_id=$1 AND is_deleted=FALSE`, [companyId]);
         return res.status(200).json({ message: "fetch CrDrReason List", crDrReasonList: result.rows });
     } catch (err) {
         console.error("[viewCrDrReasonList]", err);
@@ -1561,8 +1561,8 @@ export async function createCrDrReason(req, res) {
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         const result = await companyPool.query(
-            `INSERT INTO cr_dr_reason_mst(form_type, reason_name, user_id) VALUES ($1, $2, $3) RETURNING *`,
-            [form_type, reason_name, userId]
+            `INSERT INTO cr_dr_reason_mst(form_type, reason_name, user_id, company_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+            [form_type, reason_name, userId, companyId]
         );
         await logAudit(companyPool, {
             module_name: "CrDrReason Master", page_name: "CrDrReason Create", table_name: "cr_dr_reason_mst",
@@ -1582,7 +1582,7 @@ export async function viewCrDrReason(req, res) {
     const { companyId } = req.session.user;
     const companyPool = await getCompanyPool(companyId);
     try {
-        const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE is_deleted=FALSE and reason_id=$1`, [reasonId]);
+        const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE company_id=$1 AND is_deleted=FALSE and reason_id=$2`, [companyId, reasonId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Reason not found" });
         return res.status(200).json({ message: "CrDrReason Fetch Successfully", reason: result.rows[0] });
     } catch (err) {
@@ -1599,8 +1599,8 @@ export async function updateCrDrReason(req, res) {
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         const result = await companyPool.query(
-            `UPDATE cr_dr_reason_mst SET form_type=$1, reason_name=$2, status=$3 WHERE reason_id=$4 and is_deleted=FALSE RETURNING *`,
-            [form_type, reason_name, status, reasonId]
+            `UPDATE cr_dr_reason_mst SET form_type=$2, reason_name=$3, status=$4 WHERE company_id=$1 AND reason_id=$5 and is_deleted=FALSE RETURNING *`,
+            [companyId, form_type, reason_name, status, reasonId]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: "Reason not found" });
         await logAudit(companyPool, {
@@ -1623,8 +1623,8 @@ export async function deleteCrDrReason(req, res) {
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         const result = await companyPool.query(
-            `UPDATE cr_dr_reason_mst SET is_deleted=TRUE, status='inactive' WHERE reason_id=$1 and is_deleted=FALSE RETURNING *`,
-            [reasonId]
+            `UPDATE cr_dr_reason_mst SET is_deleted=TRUE, status='inactive' WHERE company_id=$1 AND reason_id=$2 and is_deleted=FALSE RETURNING *`,
+            [companyId, reasonId]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: "Reason not found" });
         await logAudit(companyPool, {

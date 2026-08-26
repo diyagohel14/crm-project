@@ -100,7 +100,7 @@ export function priceCalculation(itemsDetails, payload = {}) {
         };
     });
 
-    const subtotalAmount = round2(pricedItems.reduce((sum, it) => sum + (it.total_rate - it.discount_flat), 0));
+    const subtotalAmount = round2(pricedItems.reduce((sum, it) => sum + it.total_rate, 0));
     const itemsTaxAmount = round2(pricedItems.reduce((sum, it) => sum + it.tax_amount, 0));
     const discountValue = round2(pricedItems.reduce((sum, it) => sum + it.discount_flat, 0));
 

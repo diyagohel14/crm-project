@@ -416,6 +416,9 @@ CREATE TABLE IF NOT EXISTS cr_dr_reason_mst (
     user_id       INTEGER
 );
 
+ALTER TABLE cr_dr_reason_mst ADD COLUMN IF NOT EXISTS company_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_cr_dr_reason_company ON cr_dr_reason_mst(company_id, form_type, is_deleted);
+
 -- Referenced in "Notes for update master tables" section
 CREATE TABLE IF NOT EXISTS chart_of_accounts (
     account_id          SERIAL PRIMARY KEY,

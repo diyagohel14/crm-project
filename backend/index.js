@@ -13,6 +13,8 @@ import proformaRoutes from "./routes/proformaRoutes.js";
 import deliverychallanRoutes from "./routes/deliverychallanRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import purchaseInvoiceRoutes from "./routes/purchaseInvoiceRoutes.js";
+import creditNoteRoutes from "./routes/creditNoteRoutes.js";
+import debitNoteRoutes from "./routes/debitNoteRoutes.js";
 import { getAppConfig } from "./utils/env.js";
 
 const config = getAppConfig();
@@ -45,6 +47,8 @@ app.use("/api/proforma", proformaRoutes);
 app.use("/api/delivery_challan", deliverychallanRoutes);
 app.use("/api/invoice", invoiceRoutes);
 app.use("/api/purchase_invoice", purchaseInvoiceRoutes);
+app.use("/api/credit_note", creditNoteRoutes);
+app.use("/api/debit_note", debitNoteRoutes);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
