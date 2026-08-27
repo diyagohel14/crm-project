@@ -71,10 +71,10 @@ export function createDocumentNoteController({
     async function validateReason(client, reasonId, companyId) {
         if (!reasonId) return;
         const result = await client.query(
-                        `SELECT reason_id FROM cr_dr_reason_mst
+            `SELECT reason_id FROM cr_dr_reason_mst
                          WHERE reason_id = $1 AND company_id = $2 AND form_type = $3
                              AND status = 'active' AND is_deleted = FALSE`,
-                        [reasonId, companyId, kind]
+            [reasonId, companyId, kind]
         );
         if (!result.rows.length) throw badRequest(`Invalid active ${kind} note reason`);
     }
@@ -91,7 +91,7 @@ export function createDocumentNoteController({
             `SELECT ${sourceItemIdColumn}, item_id FROM ${sourceItemTable}
                          WHERE ${sourceItemIdColumn} = ANY($1::int[]) AND ${sourceIdColumn} = $2
                              AND company_id = $3 AND is_deleted = FALSE`,
-                        [sourceItemIds.map(Number), payload[sourceIdColumn], companyId]
+            [sourceItemIds.map(Number), payload[sourceIdColumn], companyId]
         );
         const validIds = new Set(result.rows.map(row => Number(row[sourceItemIdColumn])));
         if (sourceItemIds.some(id => !validIds.has(Number(id)))) {
@@ -114,7 +114,7 @@ export function createDocumentNoteController({
     }
 
     async function writeChildren(client, noteId, payload, items, userId, companyId) {
-        const priced = priceCalculation(items, { round_off: payload.round_off });
+        const priced = priceCalculation(items, payload);
         const noteItems = [];
         const insertedItemIds = [];
         const itemSql = `INSERT INTO ${itemTable} (
@@ -134,7 +134,7 @@ export function createDocumentNoteController({
             insertedItemIds.push(result.rows[0][kind === "credit" ? "credit_note_item_id" : "debit_note_item_id"]);
         }
 
-        const taxDetails = Array.isArray(payload.taxDetails) ? payload.taxDetails : [];
+        const taxDetails = priced.taxDetails;
         const taxItems = [];
         const taxSql = `INSERT INTO ${taxTable} (
             ${noteIdColumn}, ${kind === "credit" ? "credit_note_item_id" : "debit_note_item_id"}, tax_id,
@@ -150,6 +150,112 @@ export function createDocumentNoteController({
                 num(tax.tax_percentage, null), num(tax.tax_amount, null)
             ]);
             taxItems.push(result.rows[0]);
+        }
+        return { priced, noteItems, taxItems };
+    }
+
+    async function updateChildren(client, noteId, payload, items, existing, userId, companyId) {
+        const priced = priceCalculation(items, payload);
+        const childIdColumn = kind === "credit" ? "credit_note_item_id" : "debit_note_item_id";
+        const existingItems = existing.itemsDetails || [];
+        const existingById = new Map(existingItems.map(item => [Number(item[childIdColumn]), item]));
+        const usedItemIds = new Set();
+        const noteItems = [];
+
+        const itemColumns = `
+            ${itemIdField}=$1, item_id=$2, description=$3, quantity=$4, hsn_code=$5, unit_id=$6,
+            unit_rate=$7, total_rate=$8, discount_percent=$9, discount_flat=$10, tax_percent=$11,
+            tax_amount=$12, total_amount=$13, user_id=$14, updated_at=CURRENT_TIMESTAMP`;
+
+        for (let index = 0; index < priced.items.length; index += 1) {
+            const item = priced.items[index];
+            const input = items[index];
+            const requestedId = Number(input[childIdColumn]);
+            const hasRequestedId = Number.isInteger(requestedId) && requestedId > 0;
+            const current = hasRequestedId ? existingById.get(requestedId) : existingItems[index];
+            const values = [
+                Number(itemSourceId(input, itemIdField)), item.item_id, item.description, item.quantity,
+                item.hsn_code, item.unit_id, item.unit_rate, item.total_rate, item.discount_percent,
+                item.discount_flat, item.tax_percent, item.tax_amount, item.total_amount, userId
+            ];
+
+            let result;
+            if (current && !usedItemIds.has(Number(current[childIdColumn]))) {
+                usedItemIds.add(Number(current[childIdColumn]));
+                result = await client.query(
+                    `UPDATE ${itemTable} SET ${itemColumns}
+                     WHERE ${childIdColumn}=$15 AND ${noteIdColumn}=$16 AND company_id=$17
+                       AND is_deleted=FALSE RETURNING *`,
+                    [...values, current[childIdColumn], noteId, companyId]
+                );
+            } else {
+                result = await client.query(`INSERT INTO ${itemTable} (
+                    ${noteIdColumn}, ${itemIdField}, item_id, description, quantity, hsn_code, unit_id, unit_rate,
+                    total_rate, discount_percent, discount_flat, tax_percent, tax_amount, total_amount, user_id, company_id
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+                    [noteId, ...values, companyId]);
+            }
+            noteItems.push(result.rows[0]);
+        }
+
+        const activeItemIds = noteItems.map(item => Number(item[childIdColumn]));
+        const removedItemIds = existingItems
+            .map(item => Number(item[childIdColumn]))
+            .filter(id => !activeItemIds.includes(id));
+        if (removedItemIds.length) {
+            await client.query(
+                `UPDATE ${itemTable} SET is_deleted=TRUE, updated_at=CURRENT_TIMESTAMP
+                 WHERE ${noteIdColumn}=$1 AND company_id=$2 AND ${childIdColumn}=ANY($3::int[])`,
+                [noteId, companyId, removedItemIds]
+            );
+        }
+
+        const taxDetails = priced.taxDetails;
+        const existingTaxes = existing.taxDetails || [];
+        const usedTaxIds = new Set();
+        const taxItems = [];
+        for (let index = 0; index < taxDetails.length; index += 1) {
+            const tax = taxDetails[index];
+            const itemIndex = Number(tax[`${kind}_note_item_index`]);
+            const linkedItemId = Number.isInteger(itemIndex) && noteItems[itemIndex]
+                ? noteItems[itemIndex][childIdColumn]
+                : (activeItemIds.includes(Number(tax[`${kind}_note_item_id`])) ? Number(tax[`${kind}_note_item_id`]) : null);
+            const requestedTaxId = Number(tax.tax_detail_id);
+            const hasRequestedTaxId = Number.isInteger(requestedTaxId) && requestedTaxId > 0;
+            const current = hasRequestedTaxId
+                ? existingTaxes.find(row => Number(row.tax_detail_id) === requestedTaxId)
+                : existingTaxes[index];
+            const values = [
+                linkedItemId, tax.tax_id || null, num(tax.taxable_amount, null),
+                num(tax.tax_percentage, null), num(tax.tax_amount, null)
+            ];
+            let result;
+            if (current && !usedTaxIds.has(Number(current.tax_detail_id))) {
+                usedTaxIds.add(Number(current.tax_detail_id));
+                result = await client.query(`UPDATE ${taxTable} SET
+                    ${kind === "credit" ? "credit_note_item_id" : "debit_note_item_id"}=$1,
+                    tax_id=$2, taxable_amount=$3, tax_percentage=$4, tax_amount=$5, is_deleted=FALSE
+                    WHERE tax_detail_id=$6 AND ${noteIdColumn}=$7 RETURNING *`,
+                    [...values, current.tax_detail_id, noteId]);
+            } else {
+                result = await client.query(`INSERT INTO ${taxTable} (
+                    ${noteIdColumn}, ${kind === "credit" ? "credit_note_item_id" : "debit_note_item_id"},
+                    tax_id, taxable_amount, tax_percentage, tax_amount, is_deleted
+                ) VALUES ($1,$2,$3,$4,$5,$6,FALSE) RETURNING *`, [noteId, ...values]);
+            }
+            taxItems.push(result.rows[0]);
+        }
+
+        const activeTaxIds = taxItems.map(tax => Number(tax.tax_detail_id));
+        const removedTaxIds = existingTaxes
+            .map(tax => Number(tax.tax_detail_id))
+            .filter(id => !activeTaxIds.includes(id));
+        if (removedTaxIds.length) {
+            await client.query(
+                `UPDATE ${taxTable} SET is_deleted=TRUE
+                 WHERE ${noteIdColumn}=$1 AND tax_detail_id=ANY($2::int[])`,
+                [noteId, removedTaxIds]
+            );
         }
         return { priced, noteItems, taxItems };
     }
@@ -210,7 +316,7 @@ export function createDocumentNoteController({
             await client.query("COMMIT");
             return res.status(201).json({ success: true, message: `${label} created`, note: noteResult.rows[0], itemsDetails: children.noteItems, taxDetails: children.taxItems });
         } catch (err) {
-            await client.query("ROLLBACK").catch(() => {});
+            await client.query("ROLLBACK").catch(() => { });
             console.error(`[create${label.replaceAll(" ", "")}]`, err);
             const status = err.status || 500;
             return res.status(status).json({ success: false, error: status === 400 || status === 404 ? err.message : `Failed to create ${label}`, details: err.message });
@@ -243,9 +349,7 @@ export function createDocumentNoteController({
                 priced.discount_value, priced.total_tax_amount, priced.round_off, priced.total_amount,
                 payload.notes || null, noteId, companyId
             ]);
-            await client.query(`UPDATE ${itemTable} SET is_deleted=TRUE WHERE ${noteIdColumn}=$1 AND company_id=$2`, [noteId, companyId]);
-            await client.query(`UPDATE ${taxTable} SET is_deleted=TRUE WHERE ${noteIdColumn}=$1`, [noteId]);
-            const children = await writeChildren(client, noteId, payload, items, userId, companyId);
+            const children = await updateChildren(client, noteId, payload, items, existing, userId, companyId);
             await logAudit(client, {
                 module_name: label, page_name: `Update ${label}`, table_name: table, table_id: noteId,
                 action_type: "UPDATE", action_description: `${label} updated`, new_value: JSON.stringify(result.rows[0]),
@@ -254,7 +358,7 @@ export function createDocumentNoteController({
             await client.query("COMMIT");
             return res.status(200).json({ success: true, message: `${label} updated`, note: result.rows[0], itemsDetails: children.noteItems, taxDetails: children.taxItems });
         } catch (err) {
-            await client.query("ROLLBACK").catch(() => {});
+            await client.query("ROLLBACK").catch(() => { });
             const status = err.status || 500;
             return res.status(status).json({ success: false, error: status === 400 || status === 404 ? err.message : `Failed to update ${label}`, details: err.message });
         } finally { client.release(); }
@@ -275,7 +379,7 @@ export function createDocumentNoteController({
             await client.query("COMMIT");
             return res.status(200).json({ success: true, message: `${label} deleted`, note });
         } catch (err) {
-            await client.query("ROLLBACK").catch(() => {});
+            await client.query("ROLLBACK").catch(() => { });
             const status = err.status || 500;
             return res.status(status).json({ success: false, error: status === 400 ? err.message : `Failed to delete ${label}`, details: err.message });
         } finally { client.release(); }
@@ -305,7 +409,7 @@ export function createDocumentNoteController({
             await client.query("COMMIT");
             return res.status(200).json({ success: true, message: `${label} status changed`, note: result.rows[0] });
         } catch (err) {
-            await client.query("ROLLBACK").catch(() => {});
+            await client.query("ROLLBACK").catch(() => { });
             const statusCode = err.status || 500;
             return res.status(statusCode).json({ success: false, error: statusCode === 400 ? err.message : `Failed to change ${label} status`, details: err.message });
         } finally { client.release(); }

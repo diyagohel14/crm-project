@@ -69,9 +69,9 @@ test("priceCalculation computes line and document totals from qty/rate/discount/
 
   assert.equal(result.items[0].total_amount, 212.4);
   assert.equal(result.items[1].total_amount, 52.5);
-  assert.equal(result.subtotal_amount, 230); // 180 + 50
+  assert.equal(result.subtotal_amount, 250); // 200 + 50, before discount
   assert.equal(result.total_tax_amount, 34.9); // 32.4 + 2.5
-  assert.equal(result.total_amount, 274.9); // 230 + 34.9 + 10 shipping
+  assert.equal(result.total_amount, 274.9); // 250 - 20 + 34.9 + 10 shipping
   assert.equal(result.balance_due, 174.9); // 274.9 - 100 paid
 });
 
@@ -95,4 +95,38 @@ test("priceCalculation rejects a non-positive quantity", () => {
     () => priceCalculation([{ quantity: 0, unit_rate: 10 }], {}),
     /quantity must be a positive number/i
   );
+});
+
+test("priceCalculation caps a flat discount at the line gross amount", () => {
+  const result = priceCalculation([{ quantity: 1, unit_rate: 100, discount_flat: 150 }]);
+  assert.equal(result.discount_value, 100);
+  assert.equal(result.total_amount, 0);
+});
+
+test("priceCalculation rejects invalid percentage and shipping values", () => {
+  assert.throws(
+    () => priceCalculation([{ quantity: 1, unit_rate: 10, tax_percent: 101 }]),
+    /tax_percent must be between 0 and 100/i
+  );
+  assert.throws(
+    () => priceCalculation([{ quantity: 1, unit_rate: 10 }], { shipping_charges: -1 }),
+    /shipping_charges cannot be negative/i
+  );
+});
+
+test("priceCalculation uses selected tax details for the line and tax breakdown", () => {
+  const result = priceCalculation(
+    [{ invoice_item_id: 501, quantity: 2, unit_rate: 100, tax_percent: 5 }],
+    {
+      taxDetails: [
+        { invoice_item_index: 0, tax_id: 7, tax_percentage: 18, tax_amount: 1 },
+      ],
+    }
+  );
+
+  assert.equal(result.items[0].tax_percent, 18);
+  assert.equal(result.items[0].tax_amount, 36);
+  assert.equal(result.total_tax_amount, 36);
+  assert.equal(result.taxDetails[0].taxable_amount, 200);
+  assert.equal(result.taxDetails[0].tax_amount, 36);
 });

@@ -195,7 +195,7 @@ export async function createProforma(req, res) {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
 
         const insertedTaxes = [];
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const proformaItemId = resolveProformaItemLink(insertedItemIds, t);
             const taxParams = [
                 proformaId, proformaItemId, t.tax_id || null,
@@ -385,7 +385,7 @@ export async function updateProforma(req, res) {
 
         const itemIndexToId = processedItems.map(it => it.proforma_item_id);
 
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const proforma_item_id = resolveProformaItemLink(itemIndexToId, t);
 
             if (t.tax_detail_id && existingTaxIds.includes(t.tax_detail_id)) {

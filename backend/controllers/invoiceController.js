@@ -201,7 +201,7 @@ export async function createSalesInvoice(req, res) {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
 
         const insertedTaxes = [];
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const invoiceItemId = resolveInvoiceItemLink(insertedItemIds, t);
             const taxParams = [
                 invoiceId, invoiceItemId, t.tax_id || null,
@@ -397,7 +397,7 @@ export async function updateSalesInvoice(req, res) {
 
         const itemIndexToId = processedItems.map(it => it.invoice_item_id);
 
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const invoice_item_id = resolveInvoiceItemLink(itemIndexToId, t);
 
             if (t.tax_detail_id && existingTaxIds.includes(t.tax_detail_id)) {

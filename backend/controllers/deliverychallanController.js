@@ -194,7 +194,7 @@ export async function createDeliveryChallan(req, res) {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
 
         const insertedTaxes = [];
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const deliverychallanItemId = resolveDeliveryChallanItemLink(insertedItemIds, t);
             const taxParams = [
                 deliverychallanId, deliverychallanItemId, t.tax_id || null,
@@ -384,7 +384,7 @@ export async function updateDeliveryChallan(req, res) {
 
         const itemIndexToId = processedItems.map(it => it.delivery_challan_item_id);
 
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const delivery_challan_item_id = resolveDeliveryChallanItemLink(itemIndexToId, t);
 
             if (t.tax_detail_id && existingTaxIds.includes(t.tax_detail_id)) {

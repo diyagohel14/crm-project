@@ -10,25 +10,25 @@ const router = Router();
 
 //QUOTAITONS 
 router.get("/", requireAuth, 
-    // requirePermission("quotation:view"), 
+    requirePermission("quotation:view"), 
     getQuotations);  //121
 router.get("/:quotationId", requireAuth, 
-    // requirePermission("quotation:view"), 
+    requirePermission("quotation:view"), 
     getQuotations);
 router.post("/", requireAuth, 
-    // requirePermission("quotation:create"), 
+    requirePermission("quotation:create"), 
     createQuotation);  //122
 router.put("/:quotationId", requireAuth, 
-    // requirePermission("quotation:update"), 
+    requirePermission("quotation:update"), 
     updateQuotation);  //123
 router.delete("/:quotationId", requireAuth, 
-    // requirePermission("quotation:delete"), 
+    requirePermission("quotation:delete"), 
     deleteQuotation);  //124
 router.delete("/:quotationId/:quotationItemId", requireAuth, 
-    // requirePermission("quotation:delete"), 
+    requirePermission("quotation:delete"), 
     deleteQuotationItems);  //only delete the item and tax
 router.post("/:quotationId/:status", requireAuth, 
-    // requirePermission("quotation:approve"), 
+    requirePermission("quotation:approve"), 
     changeStatus);    //125
 
 

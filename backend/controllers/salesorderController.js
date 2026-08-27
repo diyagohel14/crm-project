@@ -213,7 +213,7 @@ export async function createSalesOrder(req, res) {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
 
         const insertedTaxes = [];
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const salesOrderItemId = resolveSalesOrderItemLink(insertedItemIds, t);
             const taxParams = [
                 salesOrderId, salesOrderItemId, t.tax_id || null,
@@ -411,7 +411,7 @@ export async function updateSalesOrder(req, res) {
 
         const itemIndexToId = processedItems.map(it => it.sales_order_item_id);
 
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const sales_order_item_id = resolveSalesOrderItemLink(itemIndexToId, t);
 
             if (t.tax_detail_id && existingTaxIds.includes(t.tax_detail_id)) {

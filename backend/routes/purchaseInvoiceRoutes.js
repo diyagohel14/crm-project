@@ -9,25 +9,25 @@ const router = Router();
 
 //PURCHASE INVOICE 
 router.get("/", requireAuth, 
-    // requirePermission("purchase_invoice:view"), 
+    requirePermission("purchase_invoice:view"), 
     getPurchaseInvoices);  //115
 router.get("/:invoiceId", requireAuth, 
-    // requirePermission("purchase_invoice:view"), 
+    requirePermission("purchase_invoice:view"), 
     getPurchaseInvoices);
 router.post("/", requireAuth, 
-    // requirePermission("purchase_invoice:create"), 
+    requirePermission("purchase_invoice:create"), 
     createPurchaseInvoice);  //116
 router.put("/:invoiceId", requireAuth, 
-    // requirePermission("purchase_invoice:update"), 
+    requirePermission("purchase_invoice:update"), 
     updatePurchaseInvoice);  //117
 router.delete("/:invoiceId", requireAuth, 
-    // requirePermission("purchase_invoice:delete"), 
+    requirePermission("purchase_invoice:delete"), 
     deletePurchaseInvoice);  //118
 router.delete("/:invoiceId/:invoiceItemId", requireAuth, 
-    // requirePermission("purchase_invoice:delete"), 
+    requirePermission("purchase_invoice:delete"), 
     deletePurchaseInvoiceItems);  //only delete the item and tax
 router.post("/:invoiceId/:status", requireAuth, 
-    // requirePermission("purchase_invoice:approve"), 
+    requirePermission("purchase_invoice:approve"), 
     changeStatus);    //119
 
 

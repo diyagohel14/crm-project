@@ -195,7 +195,7 @@ export async function createQuotation(req, res) {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
 
         const insertedTaxes = [];
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const quotationItemId = resolveQuotationItemLink(insertedItemIds, t);
             const taxParams = [
                 quotationId, quotationItemId, t.tax_id || null,
@@ -385,7 +385,7 @@ export async function updateQuotation(req, res) {
 
         const itemIndexToId = processedItems.map(it => it.quotation_item_id);
 
-        for (const t of taxDetails) {
+        for (const t of priced.taxDetails) {
             const quotation_item_id = resolveQuotationItemLink(itemIndexToId, t);
 
             if (t.tax_detail_id && existingTaxIds.includes(t.tax_detail_id)) {

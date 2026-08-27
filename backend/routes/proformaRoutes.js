@@ -10,25 +10,25 @@ const router = Router();
 
 //QUOTAITONS 
 router.get("/", requireAuth, 
-    // requirePermission("proforma:view"), 
+    requirePermission("proforma:view"), 
     getProformas);  //121
 router.get("/:proformaId", requireAuth, 
-    // requirePermission("proforma:view"), 
+    requirePermission("proforma:view"), 
     getProformas);
 router.post("/", requireAuth, 
-    // requirePermission("proforma:create"), 
+    requirePermission("proforma:create"), 
     createProforma);  //122
 router.put("/:proformaId", requireAuth, 
-    // requirePermission("proforma:update"), 
+    requirePermission("proforma:update"), 
     updateProforma);  //123
 router.delete("/:proformaId", requireAuth, 
-    // requirePermission("proforma:delete"), 
+    requirePermission("proforma:delete"), 
     deleteProforma);  //124
 router.delete("/:proformaId/:proformaItemId", requireAuth, 
-    // requirePermission("proforma:delete"), 
+    requirePermission("proforma:delete"), 
     deleteProformaItems);  //only delete the item and tax
 router.post("/:proformaId/:status", requireAuth, 
-    // requirePermission("proforma:approve"), 
+    requirePermission("proforma:approve"), 
     changeStatus);    //125
 
 
