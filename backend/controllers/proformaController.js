@@ -6,7 +6,7 @@ import { getNextSeries } from "../services/seriesService.js"
 import { DOCUMENT_TYPES } from "../constants/documentTypes.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
-import { deleteModule, priceCalculation, num } from "../services/allService.js"
+import { deleteModule, priceCalculationFromDatabase, num } from "../services/allService.js"
 
 export function resolveProformaItemLink(insertedItemIds = [], taxDetail = {}) {
     if (!Array.isArray(insertedItemIds)) return null;
@@ -31,8 +31,8 @@ export function resolveProformaItemLink(insertedItemIds = [], taxDetail = {}) {
 }
 
 // calculate the price details for total values
-function priceItems(itemsDetails, payload) {
-    const priced = priceCalculation(itemsDetails, payload);
+async function priceItems(client, itemsDetails, payload) {
+    const priced = await priceCalculationFromDatabase(client, itemsDetails, payload, "sales");
     priced.items = priced.items.map((it, idx) => ({
         proforma_item_id: itemsDetails[idx]?.proforma_item_id || null,
         ...it,
@@ -124,8 +124,8 @@ export async function createProforma(req, res) {
         }
 
         // Recompute every money figure server-side from qty/rate/discount/tax%.
-        const priced = priceItems(payload.itemsDetails, payload);
-        const taxDetails = Array.isArray(payload.taxDetails) ? payload.taxDetails : [];
+        const priced = await priceItems(client, payload.itemsDetails, payload);
+        const taxDetails = priced.taxDetails;
 
         await client.query('BEGIN');
 
@@ -258,8 +258,8 @@ export async function updateProforma(req, res) {
             return res.status(400).json({ success: false, error: "proforma_date is required" });
         }
 
-        const priced = priceItems(payload.itemsDetails, payload);
-        const taxDetails = Array.isArray(payload.taxDetails) ? payload.taxDetails : [];
+        const priced = await priceItems(client, payload.itemsDetails, payload);
+        const taxDetails = priced.taxDetails;
 
         await client.query('BEGIN');
 

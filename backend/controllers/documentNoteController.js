@@ -1,6 +1,6 @@
 import { getCompanyPool } from "../config/companyPoolManager.js";
 import { getNextSeries } from "../services/seriesService.js";
-import { priceCalculation, num } from "../services/allService.js";
+import { priceCalculationFromDatabase, num } from "../services/allService.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
 
@@ -114,7 +114,7 @@ export function createDocumentNoteController({
     }
 
     async function writeChildren(client, noteId, payload, items, userId, companyId) {
-        const priced = priceCalculation(items, payload);
+        const priced = await priceCalculationFromDatabase(client, items, payload, kind === "credit" ? "sales" : "purchase");
         const noteItems = [];
         const insertedItemIds = [];
         const itemSql = `INSERT INTO ${itemTable} (
@@ -155,7 +155,7 @@ export function createDocumentNoteController({
     }
 
     async function updateChildren(client, noteId, payload, items, existing, userId, companyId) {
-        const priced = priceCalculation(items, payload);
+        const priced = await priceCalculationFromDatabase(client, items, payload, kind === "credit" ? "sales" : "purchase");
         const childIdColumn = kind === "credit" ? "credit_note_item_id" : "debit_note_item_id";
         const existingItems = existing.itemsDetails || [];
         const existingById = new Map(existingItems.map(item => [Number(item[childIdColumn]), item]));
@@ -296,7 +296,7 @@ export function createDocumentNoteController({
             await validateReason(client, payload.reason_id, companyId);
             const items = await validateSourceItems(client, payload, companyId);
             const noteSeries = await getNextSeries(client, { documentTypeId, companyId, userId, financialYearId, client });
-            const priced = priceCalculation(items, { round_off: payload.round_off });
+            const priced = await priceCalculationFromDatabase(client, items, { ...payload, taxDetails: [] }, kind === "credit" ? "sales" : "purchase");
             const noteResult = await client.query(`INSERT INTO ${table} (
                 ${noteNoColumn}, ${dateColumn}, ${sourceIdColumn}, party_id, reason_id, subtotal_amount,
                 discount_value, total_tax_amount, round_off, total_amount, notes, status, user_id, company_id
@@ -341,7 +341,7 @@ export function createDocumentNoteController({
             const source = await validateSource(client, payload, companyId);
             await validateReason(client, payload.reason_id, companyId);
             const items = await validateSourceItems(client, payload, companyId);
-            const priced = priceCalculation(items, { round_off: payload.round_off });
+            const priced = await priceCalculationFromDatabase(client, items, { ...payload, taxDetails: [] }, kind === "credit" ? "sales" : "purchase");
             const result = await client.query(`UPDATE ${table} SET ${dateColumn}=$1, party_id=$2, reason_id=$3,
                 subtotal_amount=$4, discount_value=$5, total_tax_amount=$6, round_off=$7, total_amount=$8,
                 notes=$9, updated_at=CURRENT_TIMESTAMP WHERE ${noteIdColumn}=$10 AND company_id=$11 AND is_deleted=FALSE RETURNING *`, [

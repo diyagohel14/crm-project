@@ -45,6 +45,35 @@ export const num = (v, fallback = 0) => {
     return Number.isFinite(n) ? n : fallback;
 };
 
+export async function priceCalculationFromDatabase(client, itemsDetails, payload = {}, applicableOn = null) {
+    const taxDetails = Array.isArray(payload.taxDetails) ? payload.taxDetails : [];
+    const taxIds = [...new Set(taxDetails.map(tax => Number(tax.tax_id)).filter(Number.isInteger))];
+    if (taxDetails.some(tax => !Number.isInteger(Number(tax.tax_id)))) {
+        throw Object.assign(new Error("Each selected tax must include a valid tax_id"), { status: 400 });
+    }
+    if (!taxIds.length) return priceCalculation(itemsDetails, payload);
+
+    const result = await client.query(
+        `SELECT tax_id, tax_name, tax_percentage, tax_type, applicable_on
+         FROM tax_types
+         WHERE tax_id = ANY($1::int[]) AND status = 'active' AND is_deleted = FALSE`,
+        [taxIds]
+    );
+    const taxesById = new Map(result.rows.map(tax => [Number(tax.tax_id), tax]));
+    if (taxesById.size !== taxIds.length) {
+        throw Object.assign(new Error("One or more selected taxes are invalid or inactive"), { status: 400 });
+    }
+    const invalidScope = result.rows.some(tax => applicableOn && tax.applicable_on !== applicableOn && tax.applicable_on !== "both");
+    if (invalidScope) {
+        throw Object.assign(new Error(`Selected tax is not applicable to ${applicableOn} documents`), { status: 400 });
+    }
+
+    return priceCalculation(itemsDetails, {
+        ...payload,
+        taxDetails: taxDetails.map(tax => ({ ...tax, ...taxesById.get(Number(tax.tax_id)) })),
+    });
+}
+
 
 /**
  * @param {Array} itemsDetails - line items from the request body
@@ -63,6 +92,7 @@ export function priceCalculation(itemsDetails, payload = {}) {
     const itemIdFields = [
         "invoice_item_id", "purchase_invoice_item_id", "purchase_order_item_id",
         "quotation_item_id", "proforma_item_id", "sales_order_item_id", "delivery_challan_item_id",
+        "credit_note_item_id", "debit_note_item_id",
     ];
     const getTaxItemIndex = (tax) => {
         for (const field of itemIdFields) {
@@ -84,12 +114,14 @@ export function priceCalculation(itemsDetails, payload = {}) {
     for (const tax of selectedTaxes) {
         const itemIndex = getTaxItemIndex(tax);
         if (itemIndex === null) continue;
-        const percentage = num(tax.tax_percentage, NaN);
-        if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
-            throw Object.assign(new Error("Each selected tax percentage must be between 0 and 100"), { status: 400 });
+        const taxType = tax.tax_type || "percentage";
+        const taxValue = num(tax.tax_percentage, NaN);
+        if (!["percentage", "fixed"].includes(taxType) || !Number.isFinite(taxValue) || taxValue < 0
+            || (taxType === "percentage" && taxValue > 100)) {
+            throw Object.assign(new Error("Selected tax type or value is invalid"), { status: 400 });
         }
         const itemTaxes = selectedTaxByItem.get(itemIndex) || [];
-        itemTaxes.push({ tax, percentage });
+        itemTaxes.push({ tax, taxType, taxValue });
         selectedTaxByItem.set(itemIndex, itemTaxes);
     }
 
@@ -121,13 +153,18 @@ export function priceCalculation(itemsDetails, payload = {}) {
         const taxableAmount = round2(Math.max(grossAmount - discountAmount, 0));
 
         const selectedItemTaxes = selectedTaxByItem.get(idx) || [];
-        const taxPercent = selectedItemTaxes.length
-            ? round2(selectedItemTaxes.reduce((sum, tax) => sum + tax.percentage, 0))
-            : num(it.tax_percent, 0);
+        const percentageTaxes = selectedItemTaxes.filter(tax => tax.taxType === "percentage");
+        const fixedTaxes = selectedItemTaxes.filter(tax => tax.taxType === "fixed");
+        const taxPercent = percentageTaxes.length
+            ? round2(percentageTaxes.reduce((sum, tax) => sum + tax.taxValue, 0))
+            : (fixedTaxes.length ? 0 : num(it.tax_percent, 0));
         if (taxPercent < 0 || taxPercent > 100) {
             throw Object.assign(new Error(`Item #${idx + 1}: tax_percent must be between 0 and 100`), { status: 400 });
         }
-        const taxAmount = round2(taxableAmount * (taxPercent / 100));
+        const taxAmount = round2(
+            taxableAmount * (taxPercent / 100)
+            + fixedTaxes.reduce((sum, tax) => sum + tax.taxValue, 0)
+        );
 
         const lineTotal = round2(taxableAmount + taxAmount);
 
@@ -178,12 +215,16 @@ export function priceCalculation(itemsDetails, payload = {}) {
         const selectedItemTaxes = itemIndex === null ? [] : selectedTaxByItem.get(itemIndex) || [];
         const selectedTax = selectedItemTaxes.find(entry => entry.tax === tax);
         const taxableAmount = itemIndex === null ? num(tax.taxable_amount, 0) : pricedItems[itemIndex].total_rate - pricedItems[itemIndex].discount_flat;
-        const percentage = selectedTax?.percentage ?? num(tax.tax_percentage, 0);
+        const taxType = selectedTax?.taxType || tax.tax_type || "percentage";
+        const taxValue = selectedTax?.taxValue ?? num(tax.tax_percentage, 0);
         return {
             ...tax,
             taxable_amount: round2(Math.max(taxableAmount, 0)),
-            tax_percentage: percentage,
-            tax_amount: round2(Math.max(taxableAmount, 0) * (percentage / 100)),
+            tax_type: taxType,
+            tax_percentage: taxType === "percentage" ? taxValue : null,
+            tax_amount: taxType === "fixed"
+                ? round2(taxValue)
+                : round2(Math.max(taxableAmount, 0) * (taxValue / 100)),
         };
     });
 
