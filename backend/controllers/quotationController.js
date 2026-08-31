@@ -6,7 +6,7 @@ import { getNextSeries } from "../services/seriesService.js"
 import { DOCUMENT_TYPES } from "../constants/documentTypes.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
-import { deleteModule, priceCalculationFromDatabase, num } from "../services/allService.js"
+import { deleteModule, priceCalculationFromDatabase, num } from "../services/commonService.js"
 
 export function resolveQuotationItemLink(insertedItemIds = [], taxDetail = {}) {
     if (!Array.isArray(insertedItemIds)) return null;

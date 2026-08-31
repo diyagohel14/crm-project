@@ -1,6 +1,6 @@
 import { getCompanyPool } from "../config/companyPoolManager.js";
 import { getNextSeries } from "../services/seriesService.js";
-import { priceCalculationFromDatabase, num } from "../services/allService.js";
+import { priceCalculationFromDatabase, num } from "../services/commonService.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
 
@@ -284,7 +284,8 @@ export function createDocumentNoteController({
 
     async function createNote(req, res) {
         const { companyId, userId, roleId, financialYearId } = req.session.user;
-        const client = await (await getCompanyPool(companyId)).connect();
+        const companyPool = await getCompanyPool(companyId);
+        const client = await companyPool.connect();
         const { ipAddress, deviceInfo } = getRequestInfo(req);
         try {
             const payload = req.body || {};
@@ -295,7 +296,7 @@ export function createDocumentNoteController({
             const source = await validateSource(client, payload, companyId);
             await validateReason(client, payload.reason_id, companyId);
             const items = await validateSourceItems(client, payload, companyId);
-            const noteSeries = await getNextSeries(client, { documentTypeId, companyId, userId, financialYearId, client });
+            const noteSeries = await getNextSeries(companyPool, { documentTypeId, companyId, userId, financialYearId, client });
             const priced = await priceCalculationFromDatabase(client, items, { ...payload, taxDetails: [] }, kind === "credit" ? "sales" : "purchase");
             const noteResult = await client.query(`INSERT INTO ${table} (
                 ${noteNoColumn}, ${dateColumn}, ${sourceIdColumn}, party_id, reason_id, subtotal_amount,

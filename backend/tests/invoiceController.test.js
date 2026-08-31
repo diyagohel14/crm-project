@@ -13,10 +13,10 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { priceCalculation } from "../services/allService.js";
+import { priceCalculation } from "../services/commonService.js";
 import { resolveInvoiceItemLink } from "../controllers/invoiceController.js";
 
-// --- shared helper: resolveInvoiceItemLink (services/allService.js) ------------
+// --- shared helper: resolveInvoiceItemLink (services/commonService.js) ------------
 // Used by every document type's tax-details table (invoice, PO, purchase
 // invoice, quotation, proforma, delivery challan, ...).
 
@@ -54,7 +54,7 @@ test("resolveInvoiceItemLink (invoiceController re-export) behaves the same way"
   assert.equal(resolveInvoiceItemLink(insertedItemIds, { invoice_item_id: 1 }), null);
 });
 
-// --- shared helper: priceCalculation (services/allService.js) ---------------
+// --- shared helper: priceCalculation (services/commonService.js) ---------------
 // Same pricing engine invoice/PO/purchase-invoice/quotation/proforma/
 // delivery-challan controllers should all call.
 

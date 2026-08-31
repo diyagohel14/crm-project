@@ -30,8 +30,10 @@ export async function getNextSeries(pool, opts) {
     client: existingClient = null,
   } = opts;
 
-  if (!documentTypeId || !companyId) throw new Error('documentTypeId and companyId are required');
-
+  if (!documentTypeId) throw new Error('documentTypeId is required');
+  if (!companyId) throw new Error('companyId is required');
+  if (!userId) throw new Error('userId is required for new series creation');
+  
   const client = existingClient ?? await pool.connect();
   const ownsClient = !existingClient;
   try {
@@ -44,13 +46,13 @@ export async function getNextSeries(pool, opts) {
     if (financialYearId == null) {
       selectSql = `SELECT sequence_id, current_number, prefix, postfix, padding_length
                    FROM document_series
-                  WHERE document_type_id = $1 AND company_id = $2 AND financial_year_id IS NULL
+                  WHERE document_type_id = $1 AND company_id = $2 AND financial_year_id IS NULL AND status = 'active' AND is_deleted = FALSE
                   FOR UPDATE`;
       selectParams = [documentTypeId, companyId];
     } else {
       selectSql = `SELECT sequence_id, current_number, prefix, postfix, padding_length
                    FROM document_series
-                  WHERE document_type_id = $1 AND company_id = $2 AND financial_year_id = $3
+                  WHERE document_type_id = $1 AND company_id = $2 AND financial_year_id = $3 AND status = 'active' AND is_deleted = FALSE
                   FOR UPDATE`;
       selectParams = [documentTypeId, companyId, financialYearId];
     }
@@ -58,7 +60,7 @@ export async function getNextSeries(pool, opts) {
     const sel = await client.query(selectSql, selectParams);
 
     let row;
-    if (sel.rows[0]) {
+    if (sel.rows && sel.rows.length > 0) {
       row = sel.rows[0];
       const newNumber = Number(row.current_number || 0) + 1;
       await client.query('UPDATE document_series SET current_number = $1 WHERE sequence_id = $2', [newNumber, row.sequence_id]);

@@ -36,18 +36,18 @@ export const DOCUMENT_TYPES = {
 };
 
 export const DOCUMENT_SERIES = [
-  { document_type_id: 1, prefix: "EMP/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 2, prefix: "CUST/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 3, prefix: "VEND/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 4, prefix: "ITEM/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 5, prefix: "QUOTE/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 6, prefix: "PROFORMA/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 7, prefix: "PO/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 8, prefix: "INV/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 9, prefix: "PI/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 10, prefix: "DC/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 11, prefix: "CREDIT-NOTE/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 12, prefix: "DEBIT-NOTE/", postfix: "", financial_year_id: "", padding_length: "5" },
-  { document_type_id: 13, prefix: "SO/", postfix: "", financial_year_id: "", padding_length: "5" },
+  { document_type_id: 1, prefix: "EMP/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 2, prefix: "CUST/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 3, prefix: "VEND/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 4, prefix: "ITEM/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 5, prefix: "QUOTE/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 6, prefix: "PROFORMA/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 7, prefix: "PO/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 8, prefix: "INV/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 9, prefix: "PI/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 10, prefix: "DC/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 11, prefix: "CREDIT-NOTE/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 12, prefix: "DEBIT-NOTE/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 13, prefix: "SO/", postfix: "", financial_year_id: "", padding_length: 5 },
 
 ]

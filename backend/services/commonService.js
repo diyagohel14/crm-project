@@ -1,4 +1,4 @@
-//services/allService.js
+//services/commonService.js
 import { adminPool } from "../config/adminDb.js";
 import { getCompanyPool } from "../config/companyPoolManager.js";
 
