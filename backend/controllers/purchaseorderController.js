@@ -462,10 +462,11 @@ export async function updatePurchaseOrder(req, res) {
 }
 
 export async function deletePurchaseOrder(req, res) {
-    const { companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.session.user;
     const { purchaseOrderId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
+    const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         await client.query('BEGIN');
 
@@ -476,6 +477,21 @@ export async function deletePurchaseOrder(req, res) {
         }
         const itemsResult = await deleteModule(client, 'tbl_purchase_order_items', 'purchase_order_id', purchaseOrderId, { company_id: companyId });
         const taxResult = await deleteModule(client, 'tbl_purchase_order_tax_details', 'purchase_order_id', purchaseOrderId);
+
+        await logAudit(client, {
+            module_name: "Purchase Order",
+            page_name: "Delete Purchase Order",
+            table_name: "tbl_purchase_orders",
+            table_id: purchaseOrderId,
+            action_type: "DELETE",
+            action_description: "Purchase Order Deleted Successfully",
+            new_value: JSON.stringify(result.result),
+            user_id: userId,
+            role_id: roleId,
+            ip_address: ipAddress,
+            device_info: deviceInfo,
+            company_id: companyId
+        });
 
         await client.query('COMMIT');
 

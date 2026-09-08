@@ -464,10 +464,11 @@ export async function updateSalesInvoice(req, res) {
 }
 
 export async function deleteSalesInvoice(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId, userId, roleId } = req.session.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
+    const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         await client.query('BEGIN');
 
@@ -478,6 +479,23 @@ export async function deleteSalesInvoice(req, res) {
         }
         const itemsResult = await deleteModule(client, 'tbl_invoice_items', 'invoice_id', invoiceId, { company_id: companyId });
         const taxResult = await deleteModule(client, 'tbl_invoice_tax_details', 'invoice_id', invoiceId);
+
+        if (result.result.length > 0) {
+            await logAudit(client, {
+                module_name: "Invoice",
+                page_name: "Delete Invoice",
+                table_name: "tbl_invoice",
+                table_id: invoiceId,
+                action_type: "DELETE",
+                action_description: `Invoice Deleted Successfully`,
+                new_value: JSON.stringify(result.result),
+                user_id: userId,
+                role_id: roleId,
+                ip_address: ipAddress,
+                device_info: deviceInfo,
+                company_id: companyId
+            });
+        }
 
         await client.query('COMMIT');
 

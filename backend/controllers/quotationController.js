@@ -452,10 +452,11 @@ export async function updateQuotation(req, res) {
 }
 
 export async function deleteQuotation(req, res) {
-    const { companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.session.user;
     const { quotationId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
+    const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         await client.query('BEGIN');
 
@@ -467,6 +468,21 @@ export async function deleteQuotation(req, res) {
         const itemsResult = await deleteModule(client, 'tbl_quotation_items', 'quotation_id', quotationId, { company_id: companyId });
         const taxResult = await deleteModule(client, 'tbl_quotation_tax_details', 'quotation_id', quotationId);
 
+        await logAudit(client, {
+            module_name: "Quotation",
+            page_name: "Delete Quotation",
+            table_name: "tbl_quotation",
+            table_id: quotationId,
+            action_type: "DELETE",
+            action_description: "Quotation Deleted Successfully",
+            new_value: JSON.stringify(result.result),
+            user_id: userId,
+            role_id: roleId,
+            ip_address: ipAddress,
+            device_info: deviceInfo,
+            company_id: companyId
+        });
+        
         await client.query('COMMIT');
 
         return res.status(200).json({

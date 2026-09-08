@@ -3,6 +3,7 @@ import { getNextSeries } from "../services/seriesService.js";
 import { priceCalculationFromDatabase, num } from "../services/commonService.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
+import { json } from "express";
 
 const STATUS_TRANSITIONS = {
     draft: ["issued"],
@@ -352,9 +353,18 @@ export function createDocumentNoteController({
             ]);
             const children = await updateChildren(client, noteId, payload, items, existing, userId, companyId);
             await logAudit(client, {
-                module_name: label, page_name: `Update ${label}`, table_name: table, table_id: noteId,
-                action_type: "UPDATE", action_description: `${label} updated`, new_value: JSON.stringify(result.rows[0]),
-                user_id: userId, role_id: roleId, ip_address: ipAddress, device_info: deviceInfo, company_id: companyId
+                module_name: label, 
+                page_name: `Update ${label}`, 
+                table_name: table, 
+                table_id: noteId,
+                action_type: "UPDATE", 
+                action_description: `${label} updated`, 
+                new_value: JSON.stringify(result.rows[0]),
+                user_id: userId, 
+                role_id: roleId, 
+                ip_address: ipAddress, 
+                device_info: deviceInfo, 
+                company_id: companyId
             });
             await client.query("COMMIT");
             return res.status(200).json({ success: true, message: `${label} updated`, note: result.rows[0], itemsDetails: children.noteItems, taxDetails: children.taxItems });
@@ -366,17 +376,35 @@ export function createDocumentNoteController({
     }
 
     async function deleteNote(req, res) {
-        const { companyId } = req.session.user;
+        const { companyId, userId, roleId } = req.session.user;
         const { noteId } = req.params;
         const client = await (await getCompanyPool(companyId)).connect();
+        const { ipAddress, deviceInfo } = getRequestInfo(req);
+
         try {
             await client.query("BEGIN");
             const note = await loadNote(client, noteId, companyId, true);
             if (!note) { await client.query("ROLLBACK"); return res.status(404).json({ error: `${label} not found` }); }
             if (note.status !== "draft") throw badRequest(`${label} can only be deleted while in draft status`);
-            await client.query(`UPDATE ${table} SET is_deleted=TRUE, updated_at=CURRENT_TIMESTAMP WHERE ${noteIdColumn}=$1 AND company_id=$2`, [noteId, companyId]);
+            const result = await client.query(`UPDATE ${table} SET is_deleted=TRUE, updated_at=CURRENT_TIMESTAMP WHERE ${noteIdColumn}=$1 AND company_id=$2`, [noteId, companyId]);
             await client.query(`UPDATE ${itemTable} SET is_deleted=TRUE WHERE ${noteIdColumn}=$1 AND company_id=$2`, [noteId, companyId]);
             await client.query(`UPDATE ${taxTable} SET is_deleted=TRUE WHERE ${noteIdColumn}=$1`, [noteId]);
+           
+            await logAudit(client, {
+                module_name: label, 
+                page_name: `Deleted ${label}`, 
+                table_name: table, 
+                table_id: noteId,
+                action_type: "DELETE", 
+                action_description: `${label} Deleted`, 
+                new_value: JSON.stringify(result.rows[0]),
+                user_id: userId, 
+                role_id: roleId, 
+                ip_address: ipAddress, 
+                device_info: deviceInfo, 
+                company_id: companyId
+            });
+
             await client.query("COMMIT");
             return res.status(200).json({ success: true, message: `${label} deleted`, note });
         } catch (err) {

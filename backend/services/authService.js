@@ -196,11 +196,11 @@ export async function setPermissionAssignments(client, companyId, targetId, perm
 
 
 /////////////Common Function start//////////////////
-export async function logAudit(companyPool, { module_name, page_name, table_name, table_id, action_type, action_description, new_value, user_id, role_id, ip_address, device_info, company_id }) {
+export async function logAudit(companyPool, { module_name, page_name, table_name, table_id, action_type, action_description, old_value, new_value, user_id, role_id, ip_address, device_info, company_id }) {
   await companyPool.query(
-    `INSERT INTO audit_logs (module_name, page_name, table_name, table_id, action_type, action_description, new_value, user_id, role_id, ip_address, device_info, company_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [module_name, page_name, table_name, table_id, action_type, action_description, new_value, user_id, role_id, ip_address, device_info, company_id]
+    `INSERT INTO audit_logs (module_name, page_name, table_name, table_id, action_type, action_description, old_value, new_value, user_id, role_id, ip_address, device_info, company_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [module_name, page_name, table_name, table_id, action_type, action_description, old_value, new_value, user_id, role_id, ip_address, device_info, company_id]
   )
 }
 

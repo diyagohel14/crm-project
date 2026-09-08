@@ -175,6 +175,30 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "debit_notes:approve", moduleName: "Debit Notes" },  //161
   { permissionName: "debit_notes:print", moduleName: "Debit Notes" },  //162
 
+  
+  { permissionName: "warehouse:view", moduleName: "Inventory" },  //163
+  { permissionName: "warehouse:create", moduleName: "Inventory" },  //164
+  { permissionName: "warehouse:update", moduleName: "Inventory" },  //165
+  { permissionName: "warehouse:delete", moduleName: "Inventory" },  //166
+
+  { permissionName: "item_batches:view", moduleName: "Inventory" },  //167
+  { permissionName: "item_batches:create", moduleName: "Inventory" },  //168
+  { permissionName: "item_batches:update", moduleName: "Inventory" },  //169
+  { permissionName: "item_batches:delete", moduleName: "Inventory" },  //170
+
+  { permissionName: "stock:view", moduleName: "Inventory" },  //171
+
+  { permissionName: "stock_transfer:view", moduleName: "Inventory" },  //172
+  { permissionName: "stock_transfer:create", moduleName: "Inventory" },  //173
+  { permissionName: "stock_transfer:update", moduleName: "Inventory" },  //174
+  { permissionName: "stock_transfer:delete", moduleName: "Inventory" },  //175
+  { permissionName: "stock_transfer:approve", moduleName: "Inventory" },  //176
+
+  { permissionName: "stock_adjustment:view", moduleName: "Inventory" },  //177
+  { permissionName: "stock_adjustment:create", moduleName: "Inventory" },  //178
+  { permissionName: "stock_adjustment:update", moduleName: "Inventory" },  //179
+  { permissionName: "stock_adjustment:delete", moduleName: "Inventory" },  //180
+  { permissionName: "stock_adjustment:approve", moduleName: "Inventory" },  //181
 
 
 

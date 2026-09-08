@@ -451,10 +451,11 @@ export async function updateDeliveryChallan(req, res) {
 }
 
 export async function deleteDeliveryChallan(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId, userId, roleId } = req.session.user;
     const { deliverychallanId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
+    const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         await client.query('BEGIN');
 
@@ -465,6 +466,21 @@ export async function deleteDeliveryChallan(req, res) {
         }
         const itemsResult = await deleteModule(client, 'tbl_delivery_challan_items', 'delivery_challan_id', deliverychallanId, { company_id: companyId });
         const taxResult = await deleteModule(client, 'tbl_delivery_challan_tax_details', 'delivery_challan_id', deliverychallanId);
+
+        await logAudit(client, {
+            module_name: "Delivery Challan",
+            page_name: "Deleted Delivery Challan",
+            table_name: "tbl_delivery_challan",
+            table_id: deliverychallanId,
+            action_type: "DELETE",
+            action_description: "Delivery Challan Deleted Successfully",
+            new_value: JSON.stringify(result.result),
+            user_id: userId,
+            role_id: roleId,
+            ip_address: ipAddress,
+            device_info: deviceInfo,
+            company_id: companyId
+        });
 
         await client.query('COMMIT');
 
@@ -503,6 +519,7 @@ export async function deleteDeliveryChallanItems(req, res) {
 
         const taxResult = await deleteModule(client, 'tbl_delivery_challan_tax_details', 'delivery_challan_item_id', deliverychallanItemId, { delivery_challan_id: deliverychallanId });
 
+        
         await client.query('COMMIT');
 
         return res.status(200).json({

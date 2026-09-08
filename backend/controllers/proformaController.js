@@ -452,10 +452,11 @@ export async function updateProforma(req, res) {
 }
 
 export async function deleteProforma(req, res) {
-    const { companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.session.user;
     const { proformaId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
+    const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
         await client.query('BEGIN');
 
@@ -466,6 +467,21 @@ export async function deleteProforma(req, res) {
         }
         const itemsResult = await deleteModule(client, 'tbl_proforma_items', 'proforma_id', proformaId, { company_id: companyId });
         const taxResult = await deleteModule(client, 'tbl_proforma_tax_details', 'proforma_id', proformaId);
+
+        await logAudit(client, {
+            module_name: "Proforma",
+            page_name: "Delete Proforma",
+            table_name: "tbl_proforma",
+            table_id: proformaId,
+            action_type: "DELETE",
+            action_description: "Proforma Deleted Successfully",
+            new_value: JSON.stringify(result.result),
+            user_id: userId,
+            role_id: roleId,
+            ip_address: ipAddress,
+            device_info: deviceInfo,
+            company_id: companyId
+        });
 
         await client.query('COMMIT');
 

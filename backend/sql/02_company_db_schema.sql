@@ -794,6 +794,115 @@ CREATE TABLE IF NOT EXISTS item_images (
     is_deleted    BOOLEAN DEFAULT FALSE
 );
 
+-- inventory
+-- Batch / lot master. One row per (item, batch_no). Only used for items
+-- you choose to track by batch/expiry -- for everything else just leave
+-- batch_id NULL on the stock_ledger / document rows.
+CREATE TABLE IF NOT EXISTS item_batches (
+    batch_id        SERIAL PRIMARY KEY,
+    item_id         INTEGER REFERENCES tbl_items(item_id),
+    batch_no        VARCHAR(100) NOT NULL,
+    mfg_date        DATE,
+    expiry_date     DATE,
+    status          VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    is_deleted      BOOLEAN DEFAULT FALSE,
+    user_id         INTEGER,
+    company_id      INTEGER,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (item_id, batch_no)
+);
+
+
+-- Single source of truth for every stock movement. Current stock for any
+-- item/warehouse/batch = SUM(quantity WHERE txn_type='IN') - SUM(quantity
+-- WHERE txn_type='OUT'). txn_source is a plain label (not a real FK) since
+-- it can point at many different document tables (purchase invoice, sales
+-- invoice, delivery challan, stock transfer, stock adjustment, ...).
+CREATE TABLE IF NOT EXISTS stock_ledger (
+    stock_ledger_id     BIGSERIAL PRIMARY KEY,
+    item_id             INTEGER REFERENCES tbl_items(item_id),
+    warehouse_id        INTEGER REFERENCES warehouse_mst(warehouse_id),
+    batch_id            INTEGER REFERENCES item_batches(batch_id),
+    txn_date            DATE NOT NULL,
+    txn_type            VARCHAR(5) CHECK (txn_type IN ('IN', 'OUT')),
+    txn_source          VARCHAR(30) NOT NULL,     -- e.g. PURCHASE_INVOICE, SALES_INVOICE, DELIVERY_CHALLAN,
+                                                    -- STOCK_TRANSFER_IN, STOCK_TRANSFER_OUT, STOCK_ADJUSTMENT
+    source_id           INTEGER,                    -- PK of the source document header (soft ref)
+    source_item_id       INTEGER,                    -- PK of the source document line item (soft ref)
+    quantity              DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id                INTEGER REFERENCES units_of_measure(unit_id),
+    rate                     DECIMAL(20,2),             -- valuation rate at the time of this movement
+    remarks                   TEXT,
+    is_deleted                 BOOLEAN DEFAULT FALSE,
+    user_id                     INTEGER,
+    company_id                   INTEGER,
+    created_at                    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Warehouse-to-warehouse transfer
+CREATE TABLE IF NOT EXISTS stock_transfer (
+    stock_transfer_id     SERIAL PRIMARY KEY,
+    transfer_no              VARCHAR(30) UNIQUE,          -- generated from document_series
+    transfer_date               DATE,
+    from_warehouse_id              INTEGER REFERENCES warehouse_mst(warehouse_id),
+    to_warehouse_id                   INTEGER REFERENCES warehouse_mst(warehouse_id),
+    status         VARCHAR(20) DEFAULT 'draft'
+                   CHECK (status IN ('draft', 'in_transit', 'completed', 'cancelled')),
+    notes           TEXT,
+    is_deleted       BOOLEAN DEFAULT FALSE,
+    user_id           INTEGER,
+    company_id         INTEGER,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_transfer_items (
+    stock_transfer_item_id     SERIAL PRIMARY KEY,
+    stock_transfer_id             INTEGER REFERENCES stock_transfer(stock_transfer_id),
+    item_id                          INTEGER REFERENCES tbl_items(item_id),
+    batch_id                            INTEGER REFERENCES item_batches(batch_id),
+    quantity                              DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id                                 INTEGER REFERENCES units_of_measure(unit_id),
+    is_deleted     BOOLEAN DEFAULT FALSE,
+    user_id        INTEGER,
+    company_id     INTEGER,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Manual correction (physical-count variance, damage, write-off, etc.)
+CREATE TABLE IF NOT EXISTS stock_adjustment (
+    stock_adjustment_id     SERIAL PRIMARY KEY,
+    adjustment_no               VARCHAR(30) UNIQUE,        -- generated from document_series
+    adjustment_date                DATE,
+    warehouse_id                      INTEGER REFERENCES warehouse_mst(warehouse_id),
+    reason                              VARCHAR(255),
+    status         VARCHAR(20) DEFAULT 'draft'
+                   CHECK (status IN ('draft', 'approved', 'cancelled')),
+    notes           TEXT,
+    is_deleted       BOOLEAN DEFAULT FALSE,
+    user_id           INTEGER,
+    company_id         INTEGER,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_adjustment_items (
+    stock_adjustment_item_id     SERIAL PRIMARY KEY,
+    stock_adjustment_id             INTEGER REFERENCES stock_adjustment(stock_adjustment_id),
+    item_id                            INTEGER REFERENCES tbl_items(item_id),
+    batch_id                              INTEGER REFERENCES item_batches(batch_id),
+    adjustment_type                          VARCHAR(10) CHECK (adjustment_type IN ('increase', 'decrease')),
+    quantity                                    DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id                                        INTEGER REFERENCES units_of_measure(unit_id),
+    is_deleted     BOOLEAN DEFAULT FALSE,
+    user_id        INTEGER,
+    company_id     INTEGER,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- inventory
 
 -- =====================================================================
 -- SECTION 9: CRM MASTERS (referenced in "Notes for update master tables")
@@ -1497,6 +1606,16 @@ CREATE INDEX IF NOT EXISTS idx_login_audit_time ON login_audit_logs(login_time D
 CREATE INDEX IF NOT EXISTS idx_tbl_party_type ON tbl_party(party_type);
 CREATE INDEX IF NOT EXISTS idx_tbl_party_addresses_party ON tbl_party_addresses(party_id);
 CREATE INDEX IF NOT EXISTS idx_tbl_items_category ON tbl_items(item_category);
+
+-- inventory
+CREATE INDEX IF NOT EXISTS idx_item_batches_item ON item_batches(item_id);
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_item_wh ON stock_ledger(item_id, warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_batch ON stock_ledger(batch_id);
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_source ON stock_ledger(txn_source, source_id);
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_date ON stock_ledger(txn_date DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_transfer_items_transfer ON stock_transfer_items(stock_transfer_id);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustment_items_adjustment ON stock_adjustment_items(stock_adjustment_id);
+-- inventory
 
 CREATE INDEX IF NOT EXISTS idx_invoice_party ON tbl_invoice(party_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_status ON tbl_invoice(status);
