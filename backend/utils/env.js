@@ -1,8 +1,8 @@
 import "dotenv/config";
 
 const DEFAULTS = {
-  sessionSecret: "dev-session-secret-change-me",
-  jwtSecret: "dev-jwt-secret-change-me",
+  sessionSecret: "25aff6c7be813d87809545b5be1c27c2",
+  jwtSecret: "c9468946393742e073e6a9ccf5858c09f06696d11588bce5fd521d72c2c0b4dc",
   appEncryptionKey: "0000000000000000000000000000000000000000000000000000000000000000",
   adminDbHost: "localhost",
   adminDbPort: 5432,
@@ -27,7 +27,8 @@ export function getAppConfig() {
 
   return {
     sessionSecret: process.env.SESSION_SECRET || DEFAULTS.sessionSecret,
-    jwtSecret: process.env.JWT_SECRET || DEFAULTS.jwtSecret,
+    jwtSecret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || DEFAULTS.jwtSecret,
+    jwtAccessExpires: process.env.JWT_ACCESS_EXPIRES || "15m",
     appEncryptionKey,
     adminDb: {
       host: process.env.ADMIN_DB_HOST || DEFAULTS.adminDbHost,

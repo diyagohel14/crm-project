@@ -1,5 +1,5 @@
 // config/companyPoolManager.js
-
+//
 // Every tenant has its own physical Postgres database. Rather than
 // opening a fresh connection per request (slow) or one giant pool per
 // company at boot (wasteful for companies nobody is using right now),

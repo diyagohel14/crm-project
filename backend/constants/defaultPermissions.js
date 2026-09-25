@@ -200,7 +200,56 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "stock_adjustment:delete", moduleName: "Inventory" },  //180
   { permissionName: "stock_adjustment:approve", moduleName: "Inventory" },  //181
 
+  { permissionName: "project:view", moduleName: "Project" },  //182
+  { permissionName: "project:create", moduleName: "Project" },  //183
+  { permissionName: "project:update", moduleName: "Project" },  //184
+  { permissionName: "project:delete", moduleName: "Project" },  //185
+  { permissionName: "project:approve", moduleName: "Project" },  //186
 
+  { permissionName: "project_site:view", moduleName: "Project" },  //187
+  { permissionName: "project_site:create", moduleName: "Project" },  //188
+  { permissionName: "project_site:update", moduleName: "Project" },  //189
+  { permissionName: "project_site:delete", moduleName: "Project" },  //190
 
+  { permissionName: "project_boq:view", moduleName: "Project" },  //191
+  { permissionName: "project_boq:create", moduleName: "Project" },  //192
+  { permissionName: "project_boq:update", moduleName: "Project" },  //193
+  { permissionName: "project_boq:delete", moduleName: "Project" },  //194
+
+  { permissionName: "project_milestone:view", moduleName: "Project" },  //195
+  { permissionName: "project_milestone:create", moduleName: "Project" },  //196
+  { permissionName: "project_milestone:update", moduleName: "Project" },  //197
+  { permissionName: "project_milestone:delete", moduleName: "Project" },  //198
+
+  { permissionName: "project_task:view", moduleName: "Project" },  //199
+  { permissionName: "project_task:create", moduleName: "Project" },  //200
+  { permissionName: "project_task:update", moduleName: "Project" },  //201
+  { permissionName: "project_task:delete", moduleName: "Project" },  //202
+
+  { permissionName: "project_dpr:view", moduleName: "Project" },  //203
+  { permissionName: "project_dpr:create", moduleName: "Project" },  //204
+  { permissionName: "project_dpr:update", moduleName: "Project" },  //205
+  { permissionName: "project_dpr:delete", moduleName: "Project" },  //206
+
+  { permissionName: "project_document:view", moduleName: "Project" },  //207
+  { permissionName: "project_document:create", moduleName: "Project" },  //208
+  { permissionName: "project_document:delete", moduleName: "Project" },  //209
+
+  { permissionName: "requisition:view", moduleName: "Procurement Requisition" },  //210
+  { permissionName: "requisition:create", moduleName: "Procurement Requisition" },  //211
+  { permissionName: "requisition:update", moduleName: "Procurement Requisition" },  //212
+  { permissionName: "requisition:delete", moduleName: "Procurement Requisition" },  //213
+  { permissionName: "requisition:approve", moduleName: "Procurement Requisition" },  //214
+
+  { permissionName: "grn:view", moduleName: "GRN" },  //215
+  { permissionName: "grn:create", moduleName: "GRN" },  //216
+  { permissionName: "grn:update", moduleName: "GRN" },  //217
+  { permissionName: "grn:delete", moduleName: "GRN" },  //218
+  { permissionName: "grn:approve", moduleName: "GRN" },  //219
  
+  { permissionName: "site_issue:view", moduleName: "Site Issues" },  //220
+  { permissionName: "site_issue:create", moduleName: "Site Issues" },  //221
+  { permissionName: "site_issue:update", moduleName: "Site Issues" },  //222
+  { permissionName: "site_issue:delete", moduleName: "Site Issues" },  //223
+  { permissionName: "site_issue:approve", moduleName: "Site Issues" },  //224
 ];

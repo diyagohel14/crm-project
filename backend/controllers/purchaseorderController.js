@@ -46,7 +46,7 @@ const ALLOWED_STATUS_TRANSITIONS = {
     approved: ["sent", "cancelled", "rejected"],
     sent: ["confirmed", "cancelled", "rejected"],
     confirmed: ["processing", "cancelled"],
-    processing: ["partially_received", "received", "cancelled"],
+    processing: ["partially_received", "closed", "cancelled"],
     partially_received: ["received", "cancelled"],
     received: ["closed"],
     closed: [],
@@ -59,7 +59,7 @@ function isValidStatusTransition(currentStatus, newStatus) {
 
 ///////////////////////////Purchase Order Module Start /////////////////////////////
 export async function getPurchaseOrders(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { purchaseOrderId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     let result;
@@ -111,7 +111,7 @@ export async function getPurchaseOrders(req, res) {
 }
 
 export async function createPurchaseOrder(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -145,8 +145,8 @@ export async function createPurchaseOrder(req, res) {
             billing_address_id, shipping_address_id, payment_term_id, currency_id,
             subtotal_amount, discount_value, total_tax_amount,
             shipping_charges, round_off, total_amount, paid_amount, balance_due,
-            terms_conditions, notes, status, user_id, company_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+            terms_conditions, notes, status, project_id, user_id, company_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
         RETURNING *`;
 
         const purchaseOrderParams = [
@@ -170,6 +170,7 @@ export async function createPurchaseOrder(req, res) {
             payload.terms_conditions || null,
             payload.notes || null,
             payload.status || 'draft',
+            payload.project_id || null,
             userId,
             companyId
         ];
@@ -249,7 +250,7 @@ export async function createPurchaseOrder(req, res) {
 }
 
 export async function updatePurchaseOrder(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { purchaseOrderId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -290,8 +291,8 @@ export async function updatePurchaseOrder(req, res) {
             billing_address_id = $4, shipping_address_id = $5, payment_term_id = $6, currency_id = $7,
             subtotal_amount = $8, discount_value = $9, total_tax_amount = $10,
             shipping_charges = $11, round_off = $12, total_amount = $13, paid_amount = $14, balance_due = $15,
-            terms_conditions = $16, notes = $17, status = $18, updated_at = CURRENT_TIMESTAMP
-            WHERE purchase_order_id = $19 AND is_deleted = FALSE AND company_id = $20
+            terms_conditions = $16, notes = $17, status = $18, project_id = $19, updated_at = CURRENT_TIMESTAMP
+            WHERE purchase_order_id = $20 AND is_deleted = FALSE AND company_id = $21
             RETURNING *`;
 
         const purchaseOrderParams = [
@@ -314,6 +315,7 @@ export async function updatePurchaseOrder(req, res) {
             payload.terms_conditions || null,
             payload.notes || null,
             payload.status || 'draft',
+            payload.project_id || null,
             purchaseOrderId,
             companyId
         ];
@@ -462,7 +464,7 @@ export async function updatePurchaseOrder(req, res) {
 }
 
 export async function deletePurchaseOrder(req, res) {
-    const { userId, roleId, companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.user;
     const { purchaseOrderId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -514,7 +516,7 @@ export async function deletePurchaseOrder(req, res) {
 }
 
 export async function deletePurchaseOrderItems(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { purchaseOrderId, purchaseOrderItemId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -550,7 +552,7 @@ export async function deletePurchaseOrderItems(req, res) {
 }
 
 export async function changeStatus(req, res) {
-    const { userId, companyId, roleId, fullName } = req.session.user;
+    const { userId, companyId, roleId } = req.user;
     const { purchaseOrderId, status } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -593,7 +595,7 @@ export async function changeStatus(req, res) {
         );
         const user = userQuery.rows[0];
         const user_name = `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
-        const userName = user_name || user?.email || fullName || "Unknown User";
+        const userName = user_name || user?.email || "Unknown User";
 
         // Update status
         const updateQuery = `UPDATE tbl_purchase_orders SET status = $3, updated_at = CURRENT_TIMESTAMP WHERE purchase_order_id = $1 AND company_id = $2 AND is_deleted = FALSE RETURNING *`;

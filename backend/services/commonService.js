@@ -155,16 +155,43 @@ export function priceCalculation(itemsDetails, payload = {}) {
         const selectedItemTaxes = selectedTaxByItem.get(idx) || [];
         const percentageTaxes = selectedItemTaxes.filter(tax => tax.taxType === "percentage");
         const fixedTaxes = selectedItemTaxes.filter(tax => tax.taxType === "fixed");
-        const taxPercent = percentageTaxes.length
-            ? round2(percentageTaxes.reduce((sum, tax) => sum + tax.taxValue, 0))
-            : (fixedTaxes.length ? 0 : num(it.tax_percent, 0));
-        if (taxPercent < 0 || taxPercent > 100) {
-            throw Object.assign(new Error(`Item #${idx + 1}: tax_percent must be between 0 and 100`), { status: 400 });
+
+
+        // const taxPercent = percentageTaxes.length
+        //     ? round2(percentageTaxes.reduce((sum, tax) => sum + tax.taxValue, 0))
+        //     : (fixedTaxes.length ? 0 : num(it.tax_percent, 0));
+        // if (taxPercent < 0 || taxPercent > 100) {
+        //     throw Object.assign(new Error(`Item #${idx + 1}: tax_percent must be between 0 and 100`), { status: 400 });
+        // }
+        // const taxAmount = round2(
+        //     taxableAmount * (taxPercent / 100)
+        //     + fixedTaxes.reduce((sum, tax) => sum + tax.taxValue, 0)
+        // );
+        const defaultTaxPercent = num(it.tax_percent, 0);
+        const percentageTaxRate = round2(percentageTaxes.reduce((sum, tax) => sum + tax.taxValue, 0));
+        const fixedTaxAmount = round2(fixedTaxes.reduce((sum, tax) => sum + tax.taxValue, 0));
+
+        let taxAmount = 0;
+        let taxPercent = defaultTaxPercent;
+
+        if (selectedItemTaxes.length > 0) {
+            const percentageTaxAmount = round2(taxableAmount * (percentageTaxRate / 100));
+            taxAmount = round2(percentageTaxAmount + fixedTaxAmount);
+            if (taxableAmount > 0) {
+                taxPercent = round2((taxAmount / taxableAmount) * 100);
+            }
+        } else {
+            taxAmount = round2(taxableAmount * (defaultTaxPercent / 100));
+            taxPercent = defaultTaxPercent;
         }
-        const taxAmount = round2(
-            taxableAmount * (taxPercent / 100)
-            + fixedTaxes.reduce((sum, tax) => sum + tax.taxValue, 0)
-        );
+
+        if (taxPercent < 0 || taxPercent > 100) {
+            throw Object.assign(
+                new Error(`Item #${idx + 1}: calculated tax_percent must be between 0 and 100`),
+                { status: 400 }
+            );
+        }
+
 
         const lineTotal = round2(taxableAmount + taxAmount);
 
@@ -182,6 +209,8 @@ export function priceCalculation(itemsDetails, payload = {}) {
             tax_amount: taxAmount,
             total_amount: lineTotal,
         };
+
+        
     });
 
     const subtotalAmount = round2(pricedItems.reduce((sum, it) => sum + it.total_rate, 0));
@@ -215,16 +244,22 @@ export function priceCalculation(itemsDetails, payload = {}) {
         const selectedItemTaxes = itemIndex === null ? [] : selectedTaxByItem.get(itemIndex) || [];
         const selectedTax = selectedItemTaxes.find(entry => entry.tax === tax);
         const taxableAmount = itemIndex === null ? num(tax.taxable_amount, 0) : pricedItems[itemIndex].total_rate - pricedItems[itemIndex].discount_flat;
+        
+        //add
+        const safeTaxableAmount = Math.max( taxableAmount, 0 );
+
         const taxType = selectedTax?.taxType || tax.tax_type || "percentage";
         const taxValue = selectedTax?.taxValue ?? num(tax.tax_percentage, 0);
         return {
             ...tax,
-            taxable_amount: round2(Math.max(taxableAmount, 0)),
+            taxable_amount: round2(safeTaxableAmount),
             tax_type: taxType,
-            tax_percentage: taxType === "percentage" ? taxValue : null,
+            tax_percentage: taxType === "percentage" 
+                ? taxValue
+                : round2((taxValue / safeTaxableAmount) * 100 ),
             tax_amount: taxType === "fixed"
                 ? round2(taxValue)
-                : round2(Math.max(taxableAmount, 0) * (taxValue / 100)),
+                : round2(safeTaxableAmount * (round2(taxValue) / 100)),
         };
     });
 

@@ -73,9 +73,9 @@ export function createDocumentNoteController({
         if (!reasonId) return;
         const result = await client.query(
             `SELECT reason_id FROM cr_dr_reason_mst
-                         WHERE reason_id = $1 AND company_id = $2 AND form_type = $3
+                         WHERE reason_id = $1 AND form_type = $2
                              AND status = 'active' AND is_deleted = FALSE`,
-            [reasonId, companyId, kind]
+            [reasonId, kind]
         );
         if (!result.rows.length) throw badRequest(`Invalid active ${kind} note reason`);
     }
@@ -262,7 +262,7 @@ export function createDocumentNoteController({
     }
 
     async function getNotes(req, res) {
-        const { companyId } = req.session.user;
+        const { companyId } = req.user;
         const companyPool = await getCompanyPool(companyId);
         try {
             const noteId = req.params.noteId;
@@ -284,7 +284,7 @@ export function createDocumentNoteController({
     }
 
     async function createNote(req, res) {
-        const { companyId, userId, roleId, financialYearId } = req.session.user;
+        const { companyId, userId, roleId, financialYearId } = req.user;
         const companyPool = await getCompanyPool(companyId);
         const client = await companyPool.connect();
         const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -298,7 +298,8 @@ export function createDocumentNoteController({
             await validateReason(client, payload.reason_id, companyId);
             const items = await validateSourceItems(client, payload, companyId);
             const noteSeries = await getNextSeries(companyPool, { documentTypeId, companyId, userId, financialYearId, client });
-            const priced = await priceCalculationFromDatabase(client, items, { ...payload, taxDetails: [] }, kind === "credit" ? "sales" : "purchase");
+            const priced = await priceCalculationFromDatabase(client, items, /*{ ...payload, taxDetails: [] }*/ payload, kind === "credit" ? "sales" : "purchase");
+            
             const noteResult = await client.query(`INSERT INTO ${table} (
                 ${noteNoColumn}, ${dateColumn}, ${sourceIdColumn}, party_id, reason_id, subtotal_amount,
                 discount_value, total_tax_amount, round_off, total_amount, notes, status, user_id, company_id
@@ -308,6 +309,7 @@ export function createDocumentNoteController({
                 priced.total_amount, payload.notes || null, userId, companyId
             ]);
             const children = await writeChildren(client, noteResult.rows[0][noteIdColumn], payload, items, userId, companyId);
+
             await logAudit(client, {
                 module_name: label, page_name: `Create ${label}`, table_name: table,
                 table_id: noteResult.rows[0][noteIdColumn], action_type: "CREATE",
@@ -328,7 +330,7 @@ export function createDocumentNoteController({
     }
 
     async function updateNote(req, res) {
-        const { companyId, userId, roleId } = req.session.user;
+        const { companyId, userId, roleId } = req.user;
         const { noteId } = req.params;
         const client = await (await getCompanyPool(companyId)).connect();
         const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -343,7 +345,7 @@ export function createDocumentNoteController({
             const source = await validateSource(client, payload, companyId);
             await validateReason(client, payload.reason_id, companyId);
             const items = await validateSourceItems(client, payload, companyId);
-            const priced = await priceCalculationFromDatabase(client, items, { ...payload, taxDetails: [] }, kind === "credit" ? "sales" : "purchase");
+            const priced = await priceCalculationFromDatabase(client, items, /*{ ...payload, taxDetails: [] }*/ payload, kind === "credit" ? "sales" : "purchase");
             const result = await client.query(`UPDATE ${table} SET ${dateColumn}=$1, party_id=$2, reason_id=$3,
                 subtotal_amount=$4, discount_value=$5, total_tax_amount=$6, round_off=$7, total_amount=$8,
                 notes=$9, updated_at=CURRENT_TIMESTAMP WHERE ${noteIdColumn}=$10 AND company_id=$11 AND is_deleted=FALSE RETURNING *`, [
@@ -376,7 +378,7 @@ export function createDocumentNoteController({
     }
 
     async function deleteNote(req, res) {
-        const { companyId, userId, roleId } = req.session.user;
+        const { companyId, userId, roleId } = req.user;
         const { noteId } = req.params;
         const client = await (await getCompanyPool(companyId)).connect();
         const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -415,7 +417,7 @@ export function createDocumentNoteController({
     }
 
     async function changeStatus(req, res) {
-        const { companyId, userId, roleId } = req.session.user;
+        const { companyId, userId, roleId } = req.user;
         const { noteId, status } = req.params;
         const client = await (await getCompanyPool(companyId)).connect();
         const { ipAddress, deviceInfo } = getRequestInfo(req);

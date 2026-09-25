@@ -1,7 +1,9 @@
 // config/adminDb.js
-
-// ONE fixed pool for the shared Admin/Master database (companies, subscription_plans, global_users, login_audit_logs).
-// Every request touches this pool first to figure out which company database to talk to next.
+//
+// ONE fixed pool for the shared Admin/Master database (companies,
+// subscription_plans, global_users, login_audit_logs).
+// Every request touches this pool first to figure out which company
+// database to talk to next.
 
 import pg from "pg";
 import { getAppConfig } from "../utils/env.js";

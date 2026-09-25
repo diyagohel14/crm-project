@@ -6,6 +6,12 @@ import { getCompanyPool } from "../config/companyPoolManager.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { getNextSeries } from "../services/seriesService.js"
 import { DOCUMENT_TYPES } from "../constants/documentTypes.js";
+import jwt from "jsonwebtoken";
+import { randomUUID } from "node:crypto";
+import { getAppConfig } from "../utils/env.js";
+import { revokeToken } from "../utils/tokenRevocation.js";
+
+const config = getAppConfig();
 
 ////////Auth module start/////////////////
 export async function loginController(req, res) {
@@ -17,17 +23,8 @@ export async function loginController(req, res) {
   try {
     const { ipAddress, deviceInfo } = getRequestInfo(req);
 
-    const sessionUser = await Authlogin(
-      login,
-      password,
-      ipAddress,
-      deviceInfo
-    );
-    // ---- Store the important bits in the session ----
-    // Deliberately NOT storing db credentials here - only IDs. The
-    // actual pg.Pool is looked up from companyPoolManager's cache (or
-    // rebuilt from the Admin DB) on each request that needs it.
-    req.session.user = {
+    const sessionUser = await Authlogin(login, password, ipAddress, deviceInfo);
+    const user = {
       userId: sessionUser.userId,
       companyId: sessionUser.companyId,
       roleId: sessionUser.roleId,
@@ -40,8 +37,20 @@ export async function loginController(req, res) {
       ipAddress: ipAddress,
       deviceInfo: deviceInfo
     };
-    // console.log("Session user set:", req.session.user);
-    return res.json({ message: "Login successful", user: req.session.user });
+    // req.session.users = user;
+    
+    const token = jwt.sign({
+      userId: user.userId,
+      companyId: user.companyId,
+      roleId: user.roleId,
+      financialYearId: user.financialYearId,
+    }, config.jwtSecret, {
+      expiresIn: config.jwtAccessExpires,
+      subject: String(user.userId),
+      jwtid: randomUUID(),
+    });
+
+    return res.json({ message: "Login successful", token, user });
   } catch (err) {
     if (err instanceof AuthError) {
       return res.status(401).json({ error: err.message });
@@ -52,17 +61,12 @@ export async function loginController(req, res) {
 }
 
 export function logoutController(req, res) {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ error: "Failed to log out" });
-    res.clearCookie("connect.sid");
-    return res.json({ message: "Logged out" });
-  });
+  revokeToken(req.user.jti, req.user.exp);
+  return res.json({ message: "Logged out" });
 }
 
-
-
 export async function meController(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId, userId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
 
@@ -80,16 +84,25 @@ export async function meController(req, res) {
       [companyId, result.rows[0].company_profile_id]
     );
 
+    // Get user name for audit
+    const userQuery = await client.query(
+        `SELECT first_name, last_name, email FROM users WHERE user_id = $1 AND company_id = $2`,
+        [userId, companyId]
+    );
+    const userResult = userQuery.rows[0];
+    const user_name = `${userResult?.first_name || ""} ${userResult?.last_name || ""}`.trim();
+    const userName = user_name || userResult?.email || "Unknown User";
+
     res.json({
       profile_details: result.rows[0],
       bank_details: bankResult.rows[0] ?? null,
       session_user: {
-        userId: req.session.user.userId,
-        companyId: req.session.user.companyId,
-        roleId: req.session.user.roleId,
-        email: req.session.user.email,
-        fullName: req.session.user.fullName,
-        permissionSummary: req.session.user.permissionSummary,
+        userId: req.user.userId,
+        companyId: req.user.companyId,
+        roleId: req.user.roleId,
+        email: userResult?.email || "Email Not Found",
+        fullName: userName,
+        // permissionSummary: req.session.users.permissionSummary,
       },
     });
   } catch (err) {
@@ -101,7 +114,7 @@ export async function meController(req, res) {
 }
 
 export async function updatemeController(req, res) {
-  const { companyId, userId, roleId } = req.session.user;
+  const { companyId, userId, roleId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
 
@@ -118,7 +131,6 @@ export async function updatemeController(req, res) {
     const fields = {
       company_name, trade_name, logo, registration_number, gst_no, pan_no, phone, email, website, contact_name,
       address_line1, address_line2, city_id, state_id, country_id, pincode, authorized_signature,
-
     };
     const updates = [];
     const params = [];
@@ -221,7 +233,7 @@ export async function updatemeController(req, res) {
 
 ////////User module start/////////////////
 export async function viewUser(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
 
@@ -246,9 +258,9 @@ export async function viewUser(req, res) {
  */
 export async function createSubUser(req, res) {
   const { firstName, lastName, phone, email, password, roleId, departmentId } = req.body;
-  const { companyId, userId, financialYearId } = req.session.user;
+  const { companyId, userId, financialYearId } = req.user;
 
-  // console.log(req.session.user);
+  // console.log(req.user);
   if (!firstName || !phone || !email || !password || !roleId) {
     return res.status(400).json({ error: "firstName, email, phone, password and roleId are required" });
   }
@@ -290,7 +302,7 @@ export async function createSubUser(req, res) {
       action_description: "New User Created",
       new_value: JSON.stringify(userResult.rows[0]),
       user_id: userId,
-      role_id: req.session.user.roleId,
+      role_id: req.user.roleId,
       ip_address: ipAddress,
       device_info: deviceInfo,
       company_id: companyId,
@@ -329,7 +341,7 @@ export async function createSubUser(req, res) {
 
 export async function updateSubUser(req, res) {
   const { firstName, lastName, phone, profile_image, status, roleId, departmentId } = req.body;
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const { userId } = req.params;
   // console.log(req.session);
   if (!firstName || !phone || !roleId) {
@@ -372,8 +384,8 @@ export async function updateSubUser(req, res) {
       action_type: "UPDATE",
       action_description: "User details updated",
       new_value: JSON.stringify(updateResult.rows[0]),
-      user_id: req.session.user.userId,
-      role_id: req.session.user.roleId,
+      user_id: req.user.userId,
+      role_id: req.user.roleId,
       ip_address: ipAddress,
       device_info: deviceInfo,
       company_id: companyId
@@ -400,7 +412,7 @@ export async function updateSubUser(req, res) {
 }
 
 export async function deleteSubUser(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const { userId } = req.params;
 
   const companyPool = await getCompanyPool(companyId);
@@ -433,8 +445,8 @@ export async function deleteSubUser(req, res) {
       action_type: "DELETE",
       action_description: "User deleted",
       new_value: JSON.stringify(deleteResult.rows[0]),
-      user_id: req.session.user.userId,
-      role_id: req.session.user.roleId,
+      user_id: req.user.userId,
+      role_id: req.user.roleId,
       ip_address: ipAddress,
       device_info: deviceInfo,
       company_id: companyId
@@ -464,7 +476,7 @@ export async function changePassword(req, res) {
 
   const { current_password, new_password } = req.body;
 
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   if (!current_password || !new_password) {
     return res.status(400).json({ error: "Current and new password are both required" });
   }
@@ -475,7 +487,7 @@ export async function changePassword(req, res) {
   const companyPool = await getCompanyPool(companyId);
 
   try {
-    const result = await companyPool.query("SELECT password FROM users WHERE user_id = $1", [req.session.user.userId]);
+    const result = await companyPool.query("SELECT password FROM users WHERE user_id = $1", [req.user.userId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Account not found" });
     }
@@ -486,7 +498,7 @@ export async function changePassword(req, res) {
     const passwordHash = await hashPassword(new_password);
     await companyPool.query("UPDATE users SET password = $1, updated_at = NOW() WHERE user_id = $2", [
       passwordHash,
-      req.session.user.userId,
+      req.user.userId,
     ]);
     res.json({ message: "Password updated" });
   } catch (err) {
@@ -499,7 +511,7 @@ export async function changePassword(req, res) {
 
 ////////Roles module start/////////////////
 export async function viewRoles(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   try {
     const result = await companyPool.query(
@@ -517,7 +529,7 @@ export async function viewRoles(req, res) {
 
 export async function createRoles(req, res) {
   const { role_name, description } = req.body;
-  const { companyId, userId, roleId, financialYearId } = req.session.user;
+  const { companyId, userId, roleId, financialYearId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
   const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -559,7 +571,7 @@ export async function createRoles(req, res) {
 export async function updateRoles(req, res) {
   const { role_name, description } = req.body;
   const { roleId } = req.params;
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
   const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -584,8 +596,8 @@ export async function updateRoles(req, res) {
       action_type: "UPDATE",
       action_description: "Role Updated Successfully",
       new_value: JSON.stringify(result.rows[0]),
-      user_id: req.session.user.userId,
-      role_id: req.session.user.roleId,
+      user_id: req.user.userId,
+      role_id: req.user.roleId,
       ip_address: ipAddress,
       device_info: deviceInfo,
       company_id: companyId
@@ -605,7 +617,7 @@ export async function updateRoles(req, res) {
 
 export async function deleteRoles(req, res) {
   const { roleId } = req.params;
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
   const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -639,8 +651,8 @@ export async function deleteRoles(req, res) {
       action_type: "DELETE",
       action_description: "Role DELETE Successfully",
       new_value: JSON.stringify(result.rows[0]),
-      user_id: req.session.user.userId,
-      role_id: req.session.user.roleId,
+      user_id: req.user.userId,
+      role_id: req.user.roleId,
       ip_address: ipAddress,
       device_info: deviceInfo,
       company_id: companyId
@@ -661,7 +673,7 @@ export async function deleteRoles(req, res) {
 
 ////////Permission module start/////////////////
 export async function listPermissions(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
 
@@ -684,7 +696,7 @@ export async function listPermissions(req, res) {
 }
 
 export async function createPermission(req, res) {
-  const { companyId, userId } = req.session.user;
+  const { companyId, userId } = req.user;
   const { permissionName, moduleName } = req.body;
 
   if (!permissionName) {
@@ -709,7 +721,7 @@ export async function createPermission(req, res) {
 }
 
 export async function listRolePermissions(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const { roleId } = req.params;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
@@ -734,7 +746,7 @@ export async function listRolePermissions(req, res) {
 }
 
 export async function updateRolePermissions(req, res) {
-  const { companyId, userId } = req.session.user;
+  const { companyId, userId } = req.user;
   const { roleId } = req.params;
   const { permissions = [] } = req.body;
 
@@ -756,7 +768,7 @@ export async function updateRolePermissions(req, res) {
 }
 
 export async function listUserPermissions(req, res) {
-  const { companyId } = req.session.user;
+  const { companyId } = req.user;
   const { userId } = req.params;
   const companyPool = await getCompanyPool(companyId);
   const client = await companyPool.connect();
@@ -781,7 +793,7 @@ export async function listUserPermissions(req, res) {
 }
 
 export async function updateUserPermissions(req, res) {
-  const { companyId, userId: actorId } = req.session.user;
+  const { companyId, userId: actorId } = req.user;
   const { userId } = req.params;
   const { permissions = [] } = req.body;
 

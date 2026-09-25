@@ -57,7 +57,7 @@ function isValidStatusTransition(currentStatus, newStatus) {
 
 /////////////////////////// Quotation Module Start /////////////////////////////
 export async function getQuotations(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { quotationId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     let result;
@@ -109,7 +109,7 @@ export async function getQuotations(req, res) {
 }
 
 export async function createQuotation(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -243,7 +243,7 @@ export async function createQuotation(req, res) {
 }
 
 export async function updateQuotation(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { quotationId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -452,7 +452,7 @@ export async function updateQuotation(req, res) {
 }
 
 export async function deleteQuotation(req, res) {
-    const { userId, roleId, companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.user;
     const { quotationId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -504,7 +504,7 @@ export async function deleteQuotation(req, res) {
 }
 
 export async function deleteQuotationItems(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { quotationId, quotationItemId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -540,7 +540,7 @@ export async function deleteQuotationItems(req, res) {
 }
 
 export async function changeStatus(req, res) {
-    const { userId, companyId, roleId, fullName } = req.session.user;
+    const { userId, companyId, roleId } = req.user;
     const { quotationId, status } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -584,7 +584,7 @@ export async function changeStatus(req, res) {
         );
         const user = userQuery.rows[0];
         const user_name = `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
-        const userName = user_name || user?.email || fullName || "Unknown User";
+        const userName = user_name || user?.email || "Unknown User";
 
         // Update status
         const updateQuery = `UPDATE tbl_quotation SET status = $3, updated_at = CURRENT_TIMESTAMP WHERE quotation_id = $1 AND company_id = $2 AND is_deleted = FALSE RETURNING *`;

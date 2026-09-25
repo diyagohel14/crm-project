@@ -51,7 +51,10 @@ const { Pool, Client } = pg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCHEMA_SQL_PATH = path.join(__dirname, "..", "sql", "02_company_db_schema.sql");
-const SCHEMA_SQL = fs.readFileSync(SCHEMA_SQL_PATH, "utf8");
+
+function loadCompanySchemaSql() {
+  return fs.readFileSync(SCHEMA_SQL_PATH, "utf8");
+}
 
 /**
  * @param {object} input
@@ -132,7 +135,7 @@ export async function registerCompanyWithSuperAdmin(input) {
     try {
       // node-pg's simple query protocol runs a whole multi-statement
       // script fine as long as there are no bind parameters.
-      await schemaPool.query(SCHEMA_SQL);
+      await schemaPool.query(loadCompanySchemaSql());
 
       // ---- 4a. Seed a default "Super Admin" role ----
       const roleResult = await schemaPool.query(

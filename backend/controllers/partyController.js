@@ -8,7 +8,7 @@ import { DOCUMENT_TYPES } from "../constants/documentTypes.js";
 
 ///////////////Customer Module Start///////////////
 export async function viewCustomers(req, res) {
-    const { companyId, userId } = req.session.user;
+    const { companyId, userId } = req.user;
     const { customerId } = req.params;
     // const { financialYearId } = resolveFinancialYearPayload(req);
     const companyPool = await getCompanyPool(companyId);
@@ -54,8 +54,8 @@ export async function viewCustomers(req, res) {
 }
 
 export async function createCustomers(req, res) {
-    // console.log("createCustomers called", req.session.user);
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    // console.log("createCustomers called", req.user);
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -97,7 +97,7 @@ export async function createCustomers(req, res) {
 }
 
 export async function updateCustomers(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { customerId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -141,7 +141,7 @@ export async function updateCustomers(req, res) {
 }
 
 export async function deleteCustomers(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { customerId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -187,7 +187,7 @@ export async function deleteCustomers(req, res) {
 
 ///////////////Vendor Module Start///////////////
 export async function createVendors(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -229,7 +229,7 @@ export async function createVendors(req, res) {
 }
 
 export async function viewVendors(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { vendorId } = req.params;
     // const { financialYearId } = resolveFinancialYearPayload(req);
     const companyPool = await getCompanyPool(companyId);
@@ -271,7 +271,7 @@ export async function viewVendors(req, res) {
 }
 
 export async function updateVendors(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { vendorId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -315,7 +315,7 @@ export async function updateVendors(req, res) {
 }
 
 export async function deleteVendors(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { vendorId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();

@@ -15,6 +15,13 @@ export const DEFAULT_DOCUMENT_TYPES = [
   { document_type_name: "Credit Note", document_type_id: 11 },
   { document_type_name: "Debit Note", document_type_id: 12 },
   { document_type_name: "Salse Order", document_type_id: 13 },
+  { document_type_name: "Project", document_type_id: 14 },
+  { document_type_name: "Stock Transfer", document_type_id: 15 },
+  { document_type_name: "Stock Adjustment", document_type_id: 16 },
+  { document_type_name: "Requisitions", document_type_id: 17 },
+  { document_type_name: "GRN", document_type_id: 18 },
+  { document_type_name: "Site Issue", document_type_id: 19 },
+  { document_type_name: "Stock In", document_type_id: 20 },
 
 ]
 
@@ -33,6 +40,14 @@ export const DOCUMENT_TYPES = {
   CREDIT_NOTE: 11,
   DEBIT_NOTE: 12,
   SALES_ORDER: 13,
+  PROJECT: 14,
+  STOCK_TRANSFER: 15,
+  STOCK_ADJUSTMENT: 16,
+  REQUISITIONS: 17,
+  GRN: 18,
+  SITE_ISSUE: 19,
+  STOCK_IN: 20,
+
 };
 
 export const DOCUMENT_SERIES = [
@@ -49,5 +64,12 @@ export const DOCUMENT_SERIES = [
   { document_type_id: 11, prefix: "CREDIT-NOTE/", postfix: "", financial_year_id: "", padding_length: 5 },
   { document_type_id: 12, prefix: "DEBIT-NOTE/", postfix: "", financial_year_id: "", padding_length: 5 },
   { document_type_id: 13, prefix: "SO/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 14, prefix: "PROJ/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 15, prefix: "ST/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 16, prefix: "SA/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 17, prefix: "REQ/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 18, prefix: "GRN/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 19, prefix: "ISSUE/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 20, prefix: "STOCK/", postfix: "", financial_year_id: "", padding_length: 5 }
 
 ]

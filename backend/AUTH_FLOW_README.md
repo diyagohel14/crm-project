@@ -11,10 +11,14 @@ This backend now provides a stronger multi-tenant CRM foundation with admin/comp
   "companyName": "abc Pvt Ltd",
   "companyCode": "ABC01",
   "companyEmail": "info@abc.com",
+  "gstNo": "Gst123",
+  "phone": "0987654321",
+  "address": "address",
   "subscriptionPlanId": 1,
   "superAdminFirstName": "Rahul",
   "superAdminLastName": "Shah",
   "superAdminEmail": "rahul@abc.com",
+  "superAdminPhone": "1234567890",
   "superAdminPassword": "abc@123",
   "db_name": "abc"
 }
@@ -64,12 +68,14 @@ physical database) is dropped/rolled back — see the `rollback()` function.
    for that company (`config/companyPoolManager.js`).
 3. Query that company's own `users` table by email, and `bcrypt.compare()`
    the password against the hash stored there.
-4. On success: update `last_login`, write an `audit_logs` row, and store
-   in the session:
+4. On success: update `last_login`, write an `audit_logs` row, and return a
+   compact signed JWT access token containing only identity claims:
    ```js
-   req.session.user = { userId, companyId, roleId, email, fullName }
+   { userId, companyId, roleId, sub, iat, exp }
    ```
-   Deliberately **no DB credentials** go into the session — only IDs.
+   The full user details are returned separately for the frontend. Permissions
+   are loaded from the company database when a protected permission route is
+   accessed, so permission changes do not require a new token.
    Every later request re-derives the company's `pg.Pool` from the cache
    (or rebuilds it from the Admin DB if the process restarted).
 
@@ -77,8 +83,9 @@ physical database) is dropped/rolled back — see the `rollback()` function.
 
 `middleware/authMiddleware.js`:
 
-- `requireAuth` — 401s if there's no `req.session.user`.
-- `attachCompanyPool` — looks up `req.session.user.companyId` and attaches
+- `requireAuth` — validates the `Authorization: Bearer <token>` header and
+   exposes the claims as `req.user`.
+- `attachCompanyPool` — looks up `req.user.companyId` and attaches
   `req.companyPool`, so route handlers can just do
   `req.companyPool.query(...)` without re-deriving anything.
 - `requireRole([...])` — simple role gate for admin-only routes.
@@ -122,8 +129,9 @@ cp .env.example .env    # fill in real values
 - **Email verification / OTP** — your schema already has
   `otp_verification` and `password_reset_tokens` tables ready; this code
   doesn't wire them up yet since you didn't ask for that flow specifically.
-- **Session store** — swap `MemoryStore` for `connect-pg-simple` before
-  going to production (see the comment in `index.js`).
+- **Token revocation** — logout revokes the current token in the process
+   memory. For multiple backend instances, move this revocation store to a
+   shared Redis or database store.
 - **Multiple app server instances**: because `companyPoolManager.js`
   caches pools in an in-process `Map`, if you run more than one Node
   process you'll get one pool-per-process per company, which is fine —

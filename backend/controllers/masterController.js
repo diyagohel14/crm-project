@@ -6,7 +6,7 @@ import { resolveFinancialYearPayload } from "../utils/financialYear.js";
 
 ///////////////////Country Master Start///////////////////////////
 export async function viewCountryList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -21,7 +21,7 @@ export async function viewCountryList(req, res) {
 }
 
 export async function fetchCountryDropdown(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -37,7 +37,7 @@ export async function fetchCountryDropdown(req, res) {
 
 export async function createCountry(req, res) {
     const { country_name, country_code, phone_code } = req.body;
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -78,7 +78,7 @@ export async function createCountry(req, res) {
 
 export async function viewCountry(req, res) {
     const { countryId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -99,7 +99,7 @@ export async function viewCountry(req, res) {
 export async function updateCountry(req, res) {
     const { country_name, country_code, phone_code, status } = req.body;
     const { countryId } = req.params;
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -146,7 +146,7 @@ export async function updateCountry(req, res) {
 
 export async function deleteCountry(req, res) {
     const { countryId } = req.params;
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -195,7 +195,7 @@ export async function deleteCountry(req, res) {
 
 ///////////////////State Master start///////////////////////////
 export async function viewStateList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -211,7 +211,7 @@ export async function viewStateList(req, res) {
 
 export async function createState(req, res) {
     const { country_id, state_name, state_code } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -254,7 +254,7 @@ export async function createState(req, res) {
 
 export async function viewState(req, res) {
     const { stateId } = req.params;
-    const { companyId, userId } = req.session.user;
+    const { companyId, userId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -275,7 +275,7 @@ export async function viewState(req, res) {
 export async function updateState(req, res) {
     const { country_id, state_name, state_code, status } = req.body;
     const { stateId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -322,7 +322,7 @@ export async function updateState(req, res) {
 
 export async function deleteState(req, res) {
     const { stateId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -371,7 +371,7 @@ export async function deleteState(req, res) {
 
 ///////////////////City Master Start///////////////////////////
 export async function viewCityList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -387,7 +387,7 @@ export async function viewCityList(req, res) {
 
 export async function createCity(req, res) {
     const { state_id, city_name, pincode } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -430,7 +430,7 @@ export async function createCity(req, res) {
 
 export async function viewCity(req, res) {
     const { cityId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -451,7 +451,7 @@ export async function viewCity(req, res) {
 export async function updateCity(req, res) {
     const { state_id, city_name, pincode, status } = req.body;
     const { cityId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -498,7 +498,7 @@ export async function updateCity(req, res) {
 
 export async function deleteCity(req, res) {
     const { cityId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -547,7 +547,7 @@ export async function deleteCity(req, res) {
 
 ///////////////////Currency Master Start///////////////////////////
 export async function viewCurrencyList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -563,7 +563,7 @@ export async function viewCurrencyList(req, res) {
 
 export async function createCurrency(req, res) {
     const { currency_name, currency_code, symbol, exchange_rate, is_base_currency } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -606,7 +606,7 @@ export async function createCurrency(req, res) {
 
 export async function viewCurrency(req, res) {
     const { currencyId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -627,7 +627,7 @@ export async function viewCurrency(req, res) {
 export async function updateCurrency(req, res) {
     const { currency_name, currency_code, symbol, exchange_rate, is_base_currency, status } = req.body;
     const { currencyId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -674,7 +674,7 @@ export async function updateCurrency(req, res) {
 
 export async function deleteCurrency(req, res) {
     const { currencyId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -723,7 +723,7 @@ export async function deleteCurrency(req, res) {
 
 ///////////////////Tax Types Master Start///////////////////////////
 export async function viewTaxTypesList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -739,7 +739,7 @@ export async function viewTaxTypesList(req, res) {
 
 export async function createTaxTypes(req, res) {
     const { tax_name, tax_percentage, tax_type, applicable_on } = req.body; //tax_type('percentage' or 'fixed')  //applicable_on('sales' or 'purchase' or 'both') values
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -782,7 +782,7 @@ export async function createTaxTypes(req, res) {
 
 export async function viewTaxTypes(req, res) {
     const { taxId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -803,7 +803,7 @@ export async function viewTaxTypes(req, res) {
 export async function updateTaxTypes(req, res) {
     const { tax_name, tax_percentage, tax_type, applicable_on, status } = req.body;
     const { taxId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -850,7 +850,7 @@ export async function updateTaxTypes(req, res) {
 
 export async function deleteTaxTypes(req, res) {
     const { taxId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -899,7 +899,7 @@ export async function deleteTaxTypes(req, res) {
 
 ///////////////////Units(UOM) Master Start///////////////////////////
 export async function viewUnitsList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -915,7 +915,7 @@ export async function viewUnitsList(req, res) {
 
 export async function createUnits(req, res) {
     const { unit_name, unit_code, unit_type } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -958,7 +958,7 @@ export async function createUnits(req, res) {
 
 export async function viewUnits(req, res) {
     const { unitId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -979,7 +979,7 @@ export async function viewUnits(req, res) {
 export async function updateUnits(req, res) {
     const { unit_name, unit_code, unit_type, status } = req.body;
     const { unitId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1026,7 +1026,7 @@ export async function updateUnits(req, res) {
 
 export async function deleteUnits(req, res) {
     const { unitId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1075,7 +1075,7 @@ export async function deleteUnits(req, res) {
 
 ///////////////////Financial Year Master Start///////////////////////////
 export async function viewFinancialYearList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -1089,7 +1089,7 @@ export async function viewFinancialYearList(req, res) {
 }
 
 export async function createFinancialYear(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1139,7 +1139,7 @@ export async function createFinancialYear(req, res) {
 
 export async function viewFinancialYear(req, res) {
     const { financialYearId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -1158,7 +1158,7 @@ export async function viewFinancialYear(req, res) {
 
 export async function updateFinancialYear(req, res) {
     const { financialYearId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1213,7 +1213,7 @@ export async function updateFinancialYear(req, res) {
 
 export async function deleteFinancialYear(req, res) {
     const { financialYearId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1261,7 +1261,7 @@ export async function deleteFinancialYear(req, res) {
 
 ///////////////////Payment Terms Master Start///////////////////////////
 export async function viewPaymentTermsList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -1278,7 +1278,7 @@ export async function viewPaymentTermsList(req, res) {
 
 export async function createPaymentTerms(req, res) {
     const { term_name, days, status } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1319,7 +1319,7 @@ export async function createPaymentTerms(req, res) {
 
 export async function viewPaymentTerms(req, res) {
     const { paymentTermId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -1340,7 +1340,7 @@ export async function viewPaymentTerms(req, res) {
 export async function updatePaymentTerms(req, res) {
     const { term_name, days, status } = req.body;
     const { paymentTermId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1386,7 +1386,7 @@ export async function updatePaymentTerms(req, res) {
 
 export async function deletePaymentTerms(req, res) {
     const { paymentTermId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -1435,7 +1435,7 @@ export async function deletePaymentTerms(req, res) {
 //AUTO
 ///////////////////Bank Master Start///////////////////////////
 export async function viewBankList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM bank_mst WHERE is_deleted=FALSE`);
@@ -1448,7 +1448,7 @@ export async function viewBankList(req, res) {
 
 export async function createBank(req, res) {
     const { bank_name } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1479,7 +1479,7 @@ export async function createBank(req, res) {
 
 export async function viewBank(req, res) {
     const { bankId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM bank_mst WHERE is_deleted=FALSE and bank_id=$1`, [bankId]);
@@ -1494,7 +1494,7 @@ export async function viewBank(req, res) {
 export async function updateBank(req, res) {
     const { bank_name, status } = req.body;
     const { bankId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1518,7 +1518,7 @@ export async function updateBank(req, res) {
 
 export async function deleteBank(req, res) {
     const { bankId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1543,7 +1543,7 @@ export async function deleteBank(req, res) {
 
 ///////////////////CR/DR Reason Master Start///////////////////////////
 export async function viewCrDrReasonList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE company_id=$1 AND is_deleted=FALSE`, [companyId]);
@@ -1556,7 +1556,7 @@ export async function viewCrDrReasonList(req, res) {
 
 export async function createCrDrReason(req, res) {
     const { form_type, reason_name } = req.body; // form_type: 'credit' | 'debit'
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1579,7 +1579,7 @@ export async function createCrDrReason(req, res) {
 
 export async function viewCrDrReason(req, res) {
     const { reasonId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM cr_dr_reason_mst WHERE company_id=$1 AND is_deleted=FALSE and reason_id=$2`, [companyId, reasonId]);
@@ -1594,7 +1594,7 @@ export async function viewCrDrReason(req, res) {
 export async function updateCrDrReason(req, res) {
     const { form_type, reason_name, status } = req.body;
     const { reasonId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1618,7 +1618,7 @@ export async function updateCrDrReason(req, res) {
 
 export async function deleteCrDrReason(req, res) {
     const { reasonId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1643,7 +1643,7 @@ export async function deleteCrDrReason(req, res) {
 
 ///////////////////Chart Of Accounts Start///////////////////////////
 export async function viewChartOfAccountsList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM chart_of_accounts WHERE is_deleted=FALSE`);
@@ -1656,7 +1656,7 @@ export async function viewChartOfAccountsList(req, res) {
 
 export async function createChartOfAccounts(req, res) {
     const { account_code, account_name, account_type, parent_account_id } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1680,7 +1680,7 @@ export async function createChartOfAccounts(req, res) {
 
 export async function viewChartOfAccounts(req, res) {
     const { accountId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM chart_of_accounts WHERE is_deleted=FALSE and account_id=$1`, [accountId]);
@@ -1695,7 +1695,7 @@ export async function viewChartOfAccounts(req, res) {
 export async function updateChartOfAccounts(req, res) {
     const { account_code, account_name, account_type, parent_account_id, status } = req.body;
     const { accountId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1724,7 +1724,7 @@ export async function updateChartOfAccounts(req, res) {
 
 export async function deleteChartOfAccounts(req, res) {
     const { accountId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1756,7 +1756,7 @@ export async function deleteChartOfAccounts(req, res) {
 
 ///////////////////Department Master Start///////////////////////////
 export async function viewDepartmentList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM departments WHERE is_deleted=FALSE AND company_id=$1`, [companyId]);
@@ -1769,7 +1769,7 @@ export async function viewDepartmentList(req, res) {
 
 export async function createDepartment(req, res) {
     const { department_name } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1792,7 +1792,7 @@ export async function createDepartment(req, res) {
 
 export async function viewDepartment(req, res) {
     const { departmentId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -1810,7 +1810,7 @@ export async function viewDepartment(req, res) {
 export async function updateDepartment(req, res) {
     const { department_name } = req.body;
     const { departmentId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1834,7 +1834,7 @@ export async function updateDepartment(req, res) {
 
 export async function deleteDepartment(req, res) {
     const { departmentId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1866,7 +1866,7 @@ export async function deleteDepartment(req, res) {
 
 ///////////////////Branch Master Start///////////////////////////
 export async function viewBranchList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM branch_mst WHERE is_deleted=FALSE`);
@@ -1879,7 +1879,7 @@ export async function viewBranchList(req, res) {
 
 export async function createBranch(req, res) {
     const { branch_name, city_id } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1902,7 +1902,7 @@ export async function createBranch(req, res) {
 
 export async function viewBranch(req, res) {
     const { branchId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM branch_mst WHERE is_deleted=FALSE and branch_id=$1`, [branchId]);
@@ -1917,7 +1917,7 @@ export async function viewBranch(req, res) {
 export async function updateBranch(req, res) {
     const { branch_name, city_id, status } = req.body;
     const { branchId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1941,7 +1941,7 @@ export async function updateBranch(req, res) {
 
 export async function deleteBranch(req, res) {
     const { branchId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -1966,7 +1966,7 @@ export async function deleteBranch(req, res) {
 
 ///////////////////Designation Master Start///////////////////////////
 export async function viewDesignationList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM designations WHERE is_deleted=FALSE`);
@@ -1979,7 +1979,7 @@ export async function viewDesignationList(req, res) {
 
 export async function createDesignation(req, res) {
     const { designation_name, department_id } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2002,7 +2002,7 @@ export async function createDesignation(req, res) {
 
 export async function viewDesignation(req, res) {
     const { designationId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM designations WHERE is_deleted=FALSE and designation_id=$1`, [designationId]);
@@ -2017,7 +2017,7 @@ export async function viewDesignation(req, res) {
 export async function updateDesignation(req, res) {
     const { designation_name, department_id, status } = req.body;
     const { designationId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2041,7 +2041,7 @@ export async function updateDesignation(req, res) {
 
 export async function deleteDesignation(req, res) {
     const { designationId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2066,7 +2066,7 @@ export async function deleteDesignation(req, res) {
 
 ///////////////////Shift Master Start///////////////////////////
 export async function viewShiftList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM shift_master WHERE is_deleted=FALSE`);
@@ -2079,7 +2079,7 @@ export async function viewShiftList(req, res) {
 
 export async function createShift(req, res) {
     const { shift_name, start_time, end_time } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2102,7 +2102,7 @@ export async function createShift(req, res) {
 
 export async function viewShift(req, res) {
     const { shiftId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM shift_master WHERE is_deleted=FALSE and shift_id=$1`, [shiftId]);
@@ -2117,7 +2117,7 @@ export async function viewShift(req, res) {
 export async function updateShift(req, res) {
     const { shift_name, start_time, end_time, status } = req.body;
     const { shiftId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2149,7 +2149,7 @@ export async function updateShift(req, res) {
 
 export async function deleteShift(req, res) {
     const { shiftId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2174,7 +2174,7 @@ export async function deleteShift(req, res) {
 
 ///////////////////Holiday Master Start///////////////////////////
 export async function viewHolidayList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM holiday_master WHERE is_deleted=FALSE ORDER BY holiday_date`);
@@ -2187,7 +2187,7 @@ export async function viewHolidayList(req, res) {
 
 export async function createHoliday(req, res) {
     const { holiday_name, holiday_date, branch_id } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2210,7 +2210,7 @@ export async function createHoliday(req, res) {
 
 export async function viewHoliday(req, res) {
     const { holidayId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM holiday_master WHERE is_deleted=FALSE and holiday_id=$1`, [holidayId]);
@@ -2225,7 +2225,7 @@ export async function viewHoliday(req, res) {
 export async function updateHoliday(req, res) {
     const { holiday_name, holiday_date, branch_id, status } = req.body;
     const { holidayId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2249,7 +2249,7 @@ export async function updateHoliday(req, res) {
 
 export async function deleteHoliday(req, res) {
     const { holidayId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2274,7 +2274,7 @@ export async function deleteHoliday(req, res) {
 
 ///////////////////Cost Center Master Start///////////////////////////
 export async function viewCostCenterList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM cost_centers WHERE is_deleted=FALSE`);
@@ -2287,7 +2287,7 @@ export async function viewCostCenterList(req, res) {
 
 export async function createCostCenter(req, res) {
     const { cost_center_name, department_id } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2310,7 +2310,7 @@ export async function createCostCenter(req, res) {
 
 export async function viewCostCenter(req, res) {
     const { costCenterId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM cost_centers WHERE is_deleted=FALSE and cost_center_id=$1`, [costCenterId]);
@@ -2325,7 +2325,7 @@ export async function viewCostCenter(req, res) {
 export async function updateCostCenter(req, res) {
     const { cost_center_name, department_id, status } = req.body;
     const { costCenterId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2349,7 +2349,7 @@ export async function updateCostCenter(req, res) {
 
 export async function deleteCostCenter(req, res) {
     const { costCenterId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2374,7 +2374,7 @@ export async function deleteCostCenter(req, res) {
 
 ///////////////////Document Type Master Start///////////////////////////
 export async function viewDocumentTypeList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM document_type WHERE is_deleted=FALSE AND company_id=$1`, [companyId]);
@@ -2387,7 +2387,7 @@ export async function viewDocumentTypeList(req, res) {
 
 export async function createDocumentType(req, res) {
     const { document_type_name } = req.body;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2410,7 +2410,7 @@ export async function createDocumentType(req, res) {
 
 export async function viewDocumentType(req, res) {
     const { docTypeId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -2428,7 +2428,7 @@ export async function viewDocumentType(req, res) {
 export async function updateDocumentType(req, res) {
     const { document_type_name } = req.body;
     const { docTypeId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2452,7 +2452,7 @@ export async function updateDocumentType(req, res) {
 
 export async function deleteDocumentType(req, res) {
     const { docTypeId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {
@@ -2484,7 +2484,7 @@ export async function deleteDocumentType(req, res) {
 
 ///////////////////Document Series Master Start///////////////////////////
 export async function viewDocumentSeriesList(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(`SELECT * FROM document_series WHERE is_deleted=FALSE AND company_id=$1`, [companyId]);
@@ -2497,7 +2497,7 @@ export async function viewDocumentSeriesList(req, res) {
 
 export async function createDocumentSeries(req, res) {
     const { document_type_id, prefix, postfix, financial_year_id, padding_length } = req.body;
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     const financialyear_id = financial_year_id ?? financialYearId;
@@ -2523,7 +2523,7 @@ export async function createDocumentSeries(req, res) {
 
 export async function viewDocumentSeries(req, res) {
     const { sequenceId } = req.params;
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     try {
         const result = await companyPool.query(
@@ -2541,7 +2541,7 @@ export async function viewDocumentSeries(req, res) {
 export async function updateDocumentSeries(req, res) {
     const { prefix, postfix, financial_year_id, padding_length, status } = req.body;
     const { sequenceId } = req.params;
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     const financialyear_id = financial_year_id ?? financialYearId;
@@ -2569,7 +2569,7 @@ export async function updateDocumentSeries(req, res) {
 
 export async function deleteDocumentSeries(req, res) {
     const { sequenceId } = req.params;
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const { ipAddress, deviceInfo } = getRequestInfo(req);
     try {

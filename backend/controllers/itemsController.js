@@ -9,7 +9,7 @@ import { getNextSeries } from "../services/seriesService.js";
 
 ///////////////Item Masters Module Start///////////////
 export async function viewItemsTypes(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { itemTypesId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -35,8 +35,8 @@ export async function viewItemsTypes(req, res) {
 }
 
 export async function createItemsTypes(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
-    const { item_type_name, status } = req.body;
+    const { companyId, userId, roleId, financialYearId } = req.user;
+    const { item_type_name, status = 'active' } = req.body;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -91,9 +91,9 @@ export async function createItemsTypes(req, res) {
 }
 
 export async function updateItemsTypes(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemTypesId } = req.params;
-    const { item_type_name, status } = req.body;
+    const { item_type_name, status = 'active' } = req.body;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -152,7 +152,7 @@ export async function updateItemsTypes(req, res) {
 }
 
 export async function deleteItemsTypes(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemTypesId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -198,7 +198,7 @@ export async function deleteItemsTypes(req, res) {
 
 //item category
 export async function getItemsCategories(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -216,7 +216,7 @@ export async function getItemsCategories(req, res) {
     }
 }
 export async function getItemsParentCategories(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -238,7 +238,7 @@ export async function getItemsParentCategories(req, res) {
     }
 }
 export async function getItemsSubCategories(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const { itemCategoryId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -261,7 +261,7 @@ export async function getItemsSubCategories(req, res) {
     }
 }
 export async function getItemsCategoryById(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemCategoryId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -291,7 +291,7 @@ export async function getItemsCategoryById(req, res) {
 }
 
 export async function createItemsCategory(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { category_name, parent_category_id = null, status = 'active' } = req.body
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -364,7 +364,7 @@ export async function createItemsCategory(req, res) {
 
 
 export async function updateItemsCategory(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemCategoryId } = req.params;
     const { category_name, parent_category_id = null, status = 'active' } = req.body
     const companyPool = await getCompanyPool(companyId);
@@ -454,7 +454,7 @@ export async function updateItemsCategory(req, res) {
 }
 
 export async function deleteItemsCategory(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemCategoryId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -523,7 +523,9 @@ export async function deleteItemsCategory(req, res) {
 ///////////////Items Module Start/////////////////////
 
 export async function viewItems(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    // console.log("[SESS]", req.session.user);
+    // console.log("[user]", req.user);
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemsId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -557,7 +559,7 @@ export async function viewItems(req, res) {
 }
 
 export async function createItems(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -653,7 +655,7 @@ export async function createItems(req, res) {
 }
 
 export async function updateItems(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemsId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -759,7 +761,7 @@ export async function updateItems(req, res) {
 }
 
 export async function deleteItems(req,res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user
+    const { companyId, userId, roleId, financialYearId } = req.user
     const { itemsId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();

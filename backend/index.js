@@ -15,6 +15,9 @@ import invoiceRoutes from "./routes/invoiceRoutes.js";
 import purchaseInvoiceRoutes from "./routes/purchaseInvoiceRoutes.js";
 import creditNoteRoutes from "./routes/creditNoteRoutes.js";
 import debitNoteRoutes from "./routes/debitNoteRoutes.js";
+import inventoryRoutes from "./routes/inventoryRoutes.js";
+import projectRoutes from "./routes/projectRoutes.js";
+import procurementRoutes from "./routes/procurementRoutes.js";
 import { getAppConfig } from "./utils/env.js";
 
 const config = getAppConfig();
@@ -42,6 +45,8 @@ app.use("/api/party", partyRoutes);
 app.use("/api/items", itemsRoutes);
 app.use("/api/quotation", quotationRoutes);
 app.use("/api/sales_order", salesorderRoutes);
+app.use("/api/project", projectRoutes); // Project is the central object: Quotation -> Sales Order -> Project -> Procurement -> Site Execution -> Billing
+app.use("/api/procurement", procurementRoutes);
 app.use("/api/purchase_order", purchaseorderRoutes);
 app.use("/api/proforma", proformaRoutes);
 app.use("/api/delivery_challan", deliverychallanRoutes);
@@ -49,6 +54,7 @@ app.use("/api/invoice", invoiceRoutes);
 app.use("/api/purchase_invoice", purchaseInvoiceRoutes);
 app.use("/api/credit_note", creditNoteRoutes);
 app.use("/api/debit_note", debitNoteRoutes);
+app.use("/api/inventory", inventoryRoutes);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 

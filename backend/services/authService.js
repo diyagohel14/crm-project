@@ -21,107 +21,118 @@ export class AuthError extends Error {
 }
 
 export async function Authlogin(loginValue, plainPassword, ipAddress, deviceInfo) {
-  // ---- 1. Routing lookup in the Admin DB ----
-  const routeResult = await adminPool.query(
-    `SELECT global_user_id, company_id, status, email, phone
-       FROM global_users
-      WHERE (email = $1 OR phone = $1) AND is_deleted = FALSE AND status = 'active'`,
-    [loginValue]
-  );
-  const route = routeResult.rows[0];
-
-  if (!route) throw new AuthError("Invalid email/phone or password");
-  if (route.status !== "active") throw new AuthError("This account is inactive");
-
-  // ---- 2 & 3. Connect to the tenant's own DB and verify credentials ----
-  const companyPool = await getCompanyPool(route.company_id); // throws if company inactive/deleted
-
-  const userResult = await companyPool.query(
-    `SELECT user_id, first_name, last_name, email, phone, password, status, role_id
-       FROM users
-      WHERE (email = $1 OR phone = $1) AND is_deleted = FALSE AND status = 'active'`,
-    [loginValue]
-  );
-  const user = userResult.rows[0];
-
-  if (!user) throw new AuthError("Invalid email/phone or password");
-  if (user.status !== "active") throw new AuthError("This user account is not active");
-
-  let effectivePermissions = buildEffectivePermissionSummary([], []);
-
-  try {
-    const rolePermissionsResult = await companyPool.query(
-      `SELECT rp.is_allowed, p.permission_name, p.module_name
-         FROM role_permissions rp
-         JOIN permissions p ON p.permission_id = rp.permission_id
-         WHERE rp.role_id = $1 AND rp.company_id = $2 AND p.status = TRUE AND p.company_id = $2`,
-      [user.role_id, route.company_id]
+  // console.time("LOGIN TOTAL");
+  // console.time("Admin DB");
+    // 1. Admin DB routing
+    const routeResult = await adminPool.query(
+        `SELECT global_user_id, company_id, status, email, phone FROM global_users
+         WHERE (email = $1 OR phone = $1) AND is_deleted = FALSE AND status = 'active' LIMIT 1`,
+        [loginValue]
     );
+    const route = routeResult.rows[0];
+    // console.timeEnd("Admin DB");
 
-    const userPermissionsResult = await companyPool.query(
-      `SELECT up.is_allowed, p.permission_name, p.module_name
-         FROM user_permissions up
-         JOIN permissions p ON p.permission_id = up.permission_id
-         WHERE up.user_id = $1 AND up.company_id = $2 AND p.status = TRUE AND p.company_id = $2`,
-      [user.user_id, route.company_id]
+    if (!route) {
+        throw new AuthError("Invalid email/phone or password");
+    }
+    
+    // 2. Reuse cached tenant pool
+    // console.time("Company Pool");
+    const companyPool = await getCompanyPool(route.company_id);
+    // console.timeEnd("Company Pool");
+
+    // 3. Get user
+    // console.time("User Query");
+    const userResult = await companyPool.query(
+        `SELECT user_id, first_name, last_name, email, phone, password, status, role_id FROM users
+         WHERE (email = $1 OR phone = $1) AND is_deleted = FALSE AND status = 'active' LIMIT 1`,
+        [loginValue]
     );
-
-    effectivePermissions = buildEffectivePermissionSummary(
-      rolePermissionsResult.rows,
-      userPermissionsResult.rows
+    const user = userResult.rows[0];
+    // console.timeEnd("User Query");
+    if (!user) {
+        throw new AuthError("Invalid email/phone or password");
+    }
+    
+    // 4. Password check
+    // console.time("Password");
+    const passwordMatches = await verifyPassword(
+        plainPassword,
+        user.password
     );
-  } catch (permError) {
-    console.warn("[authService] Permission lookup failed; continuing with empty permission set", permError.message);
-  }
+    // console.timeEnd("Password");
 
-  const passwordMatches = await verifyPassword(plainPassword, user.password);
-  if (!passwordMatches) {
-    await loginlogAudit(companyPool, {
-      userId: null,
-      roleId: null,
-      companyId: route.company_id,
-      login_status: "failed",
-      deviceInfo: deviceInfo,
-      IpAddress: ipAddress
-    });
-    throw new AuthError("Invalid email/phone or password");
-  }
 
-  let currentFinancialYearId = null;
-  try {
-    const fyResult = await companyPool.query(
-      `SELECT financial_year_id FROM financial_years WHERE is_current = TRUE AND is_deleted = FALSE LIMIT 1`
-    );
-    currentFinancialYearId = fyResult.rows[0]?.financial_year_id ?? null;
-  } catch (fyErr) {
-    console.warn("[authService] failed to load current financial year", fyErr.message);
-  }
+    if (!passwordMatches) {
+        loginlogAudit(companyPool, {
+            userId: null,
+            roleId: null,
+            companyId: route.company_id,
+            login_status: "failed",
+            deviceInfo,
+            IpAddress: ipAddress
+        }).catch(console.error);
 
-  // ---- housekeeping: last_login + audit log (best-effort, non-fatal) ----
-  await companyPool
-    .query(`UPDATE users SET last_login = now() WHERE user_id = $1`, [user.user_id])
-    .catch((e) => console.error("[authService] failed to update last_login", e));
+        throw new AuthError("Invalid email/phone or password");
+    }
 
-  await loginlogAudit(companyPool, {
-    userId: user.user_id,
-    roleId: user.role_id,
-    companyId: route.company_id,
-    login_status: "success",
-    deviceInfo: deviceInfo,
-    IpAddress: ipAddress
-  }).catch((e) => console.error("[authService] failed to write audit log", e));
+    // 5. Parallel DB queries
+    // console.time("Permissions");
+    let rolePermissionSQL = `SELECT rp.is_allowed, p.permission_name, p.module_name FROM role_permissions rp
+             JOIN permissions p ON p.permission_id = rp.permission_id
+             WHERE rp.role_id = $1 AND rp.company_id = $2 AND p.status = TRUE AND p.company_id = $2`;
+    
+    let userPermissionSQL = `SELECT up.is_allowed, p.permission_name, p.module_name FROM user_permissions up
+             JOIN permissions p ON p.permission_id = up.permission_id
+             WHERE up.user_id = $1 AND up.company_id = $2 AND p.status = TRUE AND p.company_id = $2`;         
+    const [rolePermissionsResult, userPermissionsResult, fyResult] = await Promise.all([
+        companyPool.query(
+            rolePermissionSQL,
+            [user.role_id, route.company_id]
+        ),
 
-  return {
-    userId: user.user_id,
-    companyId: route.company_id,
-    roleId: user.role_id,
-    email: user.email,
-    phone: user.phone,
-    fullName: [user.first_name, user.last_name].filter(Boolean).join(" "),
-    permissions: effectivePermissions.permissions,
-    permissionSummary: effectivePermissions.summary,
-    financialYearId: currentFinancialYearId,
-  };
+        companyPool.query(
+            userPermissionSQL,
+            [user.user_id, route.company_id]
+        ),
+
+        companyPool.query(
+            `SELECT financial_year_id FROM financial_years
+             WHERE is_current = TRUE AND is_deleted = FALSE LIMIT 1`
+        )
+    ]);
+
+    const effectivePermissions = buildEffectivePermissionSummary(rolePermissionsResult.rows, userPermissionsResult.rows);
+    // console.timeEnd("Permissions");
+
+    // 6. Non-blocking housekeeping
+    companyPool.query(`UPDATE users SET last_login = now() WHERE user_id = $1`,
+        [user.user_id]
+    ).catch(console.error);
+
+    loginlogAudit(companyPool, {
+        userId: user.user_id,
+        roleId: user.role_id,
+        companyId: route.company_id,
+        login_status: "success",
+        deviceInfo,
+        IpAddress: ipAddress
+    }).catch(console.error);
+// console.timeEnd("LOGIN TOTAL");
+    return {
+        userId: user.user_id,
+        companyId: route.company_id,
+        roleId: user.role_id,
+        email: user.email,
+        phone: user.phone,
+        fullName: [
+            user.first_name,
+            user.last_name
+        ].filter(Boolean).join(" "),
+        permissions: effectivePermissions.permissions,
+        permissionSummary: effectivePermissions.summary,
+        financialYearId: fyResult.rows[0]?.financial_year_id ?? null
+    };
 }
 
 async function loginlogAudit(companyPool, { userId, roleId, companyId, login_status, deviceInfo, IpAddress }) {

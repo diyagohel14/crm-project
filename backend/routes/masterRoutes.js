@@ -28,7 +28,7 @@ import { requireAuth, requirePermission, requireRole } from "../middleware/authM
 const router = Router();
 
 //Country Master
-router.get("/country", requireAuth, requirePermission("country:view"), viewCountryList);    //13    //User for country list
+router.get("/country", requireAuth, requirePermission("country:view"), viewCountryList);    //13    //Use for country list
 router.get("/countrydd", requireAuth, fetchCountryDropdown);    //User for fetch country DropDown
 router.post("/country", requireAuth, requirePermission("country:create"), createCountry);   //14
 router.get("/country/:countryId", requireAuth, requirePermission("country:view"), viewCountry);

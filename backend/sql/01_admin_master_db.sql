@@ -7,7 +7,7 @@
 -- Then run this whole file against it.
 -- =====================================================================
 CREATE TABLE
-    admins (
+    IF NOT EXISTS admins (
         admin_id SERIAL PRIMARY KEY,
         full_name VARCHAR(150),
         email VARCHAR(150) UNIQUE NOT NULL,
@@ -81,11 +81,12 @@ CREATE TABLE
 CREATE TABLE
     IF NOT EXISTS login_audit_logs (
         log_id SERIAL PRIMARY KEY,
-        global_user_id INTEGER REFERENCES global_users (global_user_id),
-        company_id INTEGER REFERENCES companies (company_id),
+        admin_id INTEGER REFERENCES admins (admin_id),
+        email_attempted VARCHAR(100),
         ip_address VARCHAR(45),
         device_info VARCHAR(255),
         login_status VARCHAR(10) CHECK (login_status IN ('success', 'failed')),
+        description VARCHAR(150),
         login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -98,8 +99,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_company_code_active ON companies (company_
 
 CREATE INDEX IF NOT EXISTS idx_global_users_company ON global_users (company_id);
 
-CREATE INDEX IF NOT EXISTS idx_login_audit_global_user ON login_audit_logs (global_user_id);
-
-CREATE INDEX IF NOT EXISTS idx_login_audit_company ON login_audit_logs (company_id);
+CREATE INDEX IF NOT EXISTS idx_login_audit_admin_user ON login_audit_logs (admin_id);
 
 CREATE INDEX IF NOT EXISTS idx_login_audit_time ON login_audit_logs (login_time DESC);

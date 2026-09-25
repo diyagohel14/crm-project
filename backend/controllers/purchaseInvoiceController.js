@@ -56,7 +56,7 @@ function isValidStatusTransition(currentStatus, newStatus) {
 
 ///////////////////////////Sales Invoice Module Start /////////////////////////////
 export async function getPurchaseInvoices(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     let result;
@@ -108,7 +108,7 @@ export async function getPurchaseInvoices(req, res) {
 }
 
 export async function createPurchaseInvoice(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -142,8 +142,8 @@ export async function createPurchaseInvoice(req, res) {
             billing_address_id, shipping_address_id, currency_id,
             subtotal_amount, discount_value, total_tax_amount,
             round_off, total_amount, paid_amount, balance_due,
-            terms_conditions, notes, status, user_id, company_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+            terms_conditions, notes, status, project_id, user_id, company_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
         RETURNING *`;
 
         const invoiceParams = [
@@ -170,6 +170,7 @@ export async function createPurchaseInvoice(req, res) {
             payload.terms_conditions || null,
             payload.notes || null,
             payload.status || 'draft',
+            payload.project_id || null,
             userId,
             companyId
         ];
@@ -249,7 +250,7 @@ export async function createPurchaseInvoice(req, res) {
 }
 
 export async function updatePurchaseInvoice(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -290,8 +291,8 @@ export async function updatePurchaseInvoice(req, res) {
             billing_address_id = $7, shipping_address_id = $8, currency_id = $9,
             subtotal_amount = $10, discount_value = $11, total_tax_amount = $12,
             round_off = $13, total_amount = $14, paid_amount = $15, balance_due = $16,
-            terms_conditions = $17, notes = $18, status = $19, updated_at = CURRENT_TIMESTAMP
-            WHERE purchase_invoice_id = $20 AND is_deleted = FALSE AND company_id = $21
+            terms_conditions = $17, notes = $18, status = $19, project_id = $20, updated_at = CURRENT_TIMESTAMP
+            WHERE purchase_invoice_id = $21 AND is_deleted = FALSE AND company_id = $22
             RETURNING *`;
 
         const invoiceParams = [
@@ -316,6 +317,7 @@ export async function updatePurchaseInvoice(req, res) {
             payload.terms_conditions || null,
             payload.notes || null,
             payload.status || 'draft',
+            payload.project_id || null,
             invoiceId,
             companyId
         ];
@@ -464,7 +466,7 @@ export async function updatePurchaseInvoice(req, res) {
 }
 
 export async function deletePurchaseInvoice(req, res) {
-    const { userId, roleId, companyId } = req.session.user;
+    const { userId, roleId, companyId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -516,7 +518,7 @@ export async function deletePurchaseInvoice(req, res) {
 }
 
 export async function deletePurchaseInvoiceItems(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { invoiceId, invoiceItemId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -552,7 +554,7 @@ export async function deletePurchaseInvoiceItems(req, res) {
 }
 
 export async function changeStatus(req, res) {
-    const { userId, companyId, roleId, fullName } = req.session.user;
+    const { userId, companyId, roleId } = req.user;
     const { invoiceId, status } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -595,7 +597,7 @@ export async function changeStatus(req, res) {
         );
         const user = userQuery.rows[0];
         const user_name = `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
-        const userName = user_name || user?.email || fullName || "Unknown User";
+        const userName = user_name || user?.email || "Unknown User";
 
         // Update status
         const updateQuery = `UPDATE tbl_purchase_invoices SET status = $3, updated_at = CURRENT_TIMESTAMP WHERE purchase_invoice_id = $1 AND company_id = $2 AND is_deleted = FALSE RETURNING *`;

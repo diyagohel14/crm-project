@@ -5,6 +5,9 @@ import { hashPassword, verifyPassword } from "../utils/password.js";
 import { getCompanyPool, evictCompanyPool } from "../config/companyPoolManager.js";
 import { buildCompanyDbName, quoteIdent } from "../utils/dbIdentifier.js";
 import { getAppConfig } from "../utils/env.js";
+import { randomUUID } from "node:crypto";
+import { revokeToken } from "../utils/tokenRevocation.js";
+import { getRequestInfo } from "../utils/crypto.js";
 import jwt from "jsonwebtoken";
 import pg from "pg";
 
@@ -42,7 +45,7 @@ export async function registerAdmin(req, res) {
 
 export async function loginAdmin(req, res) {
   const { email, password } = req.body;
-
+  const { ipAddress, deviceInfo } = getRequestInfo(req);
   if (!email || !password) {
     return res.status(400).json({ error: "Email and Password are required" });
   }
@@ -55,25 +58,75 @@ export async function loginAdmin(req, res) {
     const admin = result.rows[0];
 
     if (!admin) {
-      return res.status(401).json({ error: "Invalid Email or Password" });
+      await adminPool.query(
+        `INSERT INTO login_audit_logs
+          (admin_id, email_attempted, ip_address, device_info, login_status, description)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          null,
+          email,
+          ipAddress,
+          deviceInfo,
+          "failed",
+          "Invalid Admin Email"
+        ]
+      );
+
+      return res.status(401).json({ error: "Invalid Email" });
     }
 
     const isPasswordValid = await verifyPassword(password, admin.password_hash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: "Invalid Email and Password" });
+      await adminPool.query(
+        `INSERT INTO login_audit_logs
+          (admin_id, email_attempted, ip_address, device_info, login_status, description)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          null,
+          email,
+          ipAddress,
+          deviceInfo,
+          "failed",
+          "Invalid Admin Password"
+        ]
+      );
+      return res.status(401).json({ error: "Invalid Password" });
     }
 
-    const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: "7d" });
-
-    req.session.admin = {
-      id: admin.admin_id, full_name: admin.full_name, email: admin.email
-    }
+    const token = jwt.sign(
+      {
+        tokenType: "admin",
+        adminId: admin.admin_id,
+        email: admin.email,
+      },
+      config.jwtSecret,
+      { expiresIn: "7d", jwtid: randomUUID() }
+    );
 
     const update = await adminPool.query(
       `UPDATE admins SET last_login = now() WHERE admin_id = $1`,
       [admin.admin_id]
     )
-    return res.status(200).json({ message: "Login successful", token, admin: req.session.admin });
+
+     await adminPool.query(
+      `INSERT INTO login_audit_logs
+        (admin_id, email_attempted, ip_address, device_info, login_status, description)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        admin.admin_id,
+        email,
+        ipAddress,
+        deviceInfo,
+        "success",
+        "Login Successfully"
+      ]
+    );
+
+    return res.status(200).json({
+      message: "Login successful",
+      token,
+      admin: { id: admin.admin_id, full_name: admin.full_name, email: admin.email },
+    });
 
   } catch (err) {
     console.error("[loginAdmin]", err);
@@ -82,14 +135,8 @@ export async function loginAdmin(req, res) {
 }
 
 export async function logoutAdmin(req, res) {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("[logoutAdmin]", err);
-      return res.status(500).json({ error: "Failed to log out" });
-    }
-    res.clearCookie("connect.sid");
-    return res.json({ message: "Logged out" });
-  });
+  revokeToken(req.admin.jti, req.admin.exp);
+  return res.json({ message: "Logged out" });
 }
 
 ////////////////Admin Auth module end///////////////////

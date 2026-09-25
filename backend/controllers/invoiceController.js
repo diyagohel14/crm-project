@@ -57,7 +57,7 @@ function isValidStatusTransition(currentStatus, newStatus) {
 
 ///////////////////////////Sales Invoice Module Start /////////////////////////////
 export async function getSalesInvoices(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     let result;
@@ -109,7 +109,7 @@ export async function getSalesInvoices(req, res) {
 }
 
 export async function createSalesInvoice(req, res) {
-    const { companyId, userId, roleId, financialYearId } = req.session.user;
+    const { companyId, userId, roleId, financialYearId } = req.user;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
     const { ipAddress, deviceInfo } = getRequestInfo(req);
@@ -249,7 +249,7 @@ export async function createSalesInvoice(req, res) {
 }
 
 export async function updateSalesInvoice(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -464,7 +464,7 @@ export async function updateSalesInvoice(req, res) {
 }
 
 export async function deleteSalesInvoice(req, res) {
-    const { companyId, userId, roleId } = req.session.user;
+    const { companyId, userId, roleId } = req.user;
     const { invoiceId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -518,7 +518,7 @@ export async function deleteSalesInvoice(req, res) {
 }
 
 export async function deleteSalesInvoiceItems(req, res) {
-    const { companyId } = req.session.user;
+    const { companyId } = req.user;
     const { invoiceId, invoiceItemId } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -554,7 +554,7 @@ export async function deleteSalesInvoiceItems(req, res) {
 }
 
 export async function changeStatus(req, res) {
-    const { userId, companyId, roleId, fullName } = req.session.user;
+    const { userId, companyId, roleId } = req.user;
     const { invoiceId, status } = req.params;
     const companyPool = await getCompanyPool(companyId);
     const client = await companyPool.connect();
@@ -597,7 +597,7 @@ export async function changeStatus(req, res) {
         );
         const user = userQuery.rows[0];
         const user_name = `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
-        const userName = user_name || user?.email || fullName || "Unknown User";
+        const userName = user_name || user?.email || "Unknown User";
 
         // Update status
         const updateQuery = `UPDATE tbl_invoice SET status = $3, updated_at = CURRENT_TIMESTAMP WHERE invoice_id = $1 AND company_id = $2 AND is_deleted = FALSE RETURNING *`;

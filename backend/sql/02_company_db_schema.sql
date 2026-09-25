@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS city_mst (
     city_id        SERIAL PRIMARY KEY,
     state_id       INTEGER REFERENCES state_mst(state_id),
     city_name      VARCHAR(100) NOT NULL UNIQUE,
-    pincode        VARCHAR(10),                     -- optional flat field; pincode_mst below is the granular option
+    pincode        VARCHAR(10),                     -- optional flat field pincode_mst below is the granular option
     status         VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     is_deleted     BOOLEAN DEFAULT FALSE,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS languages (
 CREATE TABLE IF NOT EXISTS tax_types (
     tax_id           SERIAL PRIMARY KEY,
     tax_name         VARCHAR(50) NOT NULL,            -- e.g. CGST, SGST, IGST, VAT
-    tax_percentage   DECIMAL(5,2),
+    tax_percentage   DECIMAL(20,2),
     tax_type         VARCHAR(20) CHECK (tax_type IN ('percentage', 'fixed')),
     applicable_on    VARCHAR(20) CHECK (applicable_on IN ('sales', 'purchase', 'both')),
     status           VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS units_of_measure (
     unit_id     SERIAL PRIMARY KEY,
     unit_name   VARCHAR(50) NOT NULL,                 -- e.g. Kilogram, Piece, Liter
     unit_code   VARCHAR(10),                           -- e.g. KG, PCS, LTR
-    unit_type   VARCHAR(20) CHECK (unit_type IN ('weight', 'volume', 'count', 'length')),  -- optional
+    unit_type   VARCHAR(20), -- CHECK (unit_type IN ('weight', 'volume', 'count', 'length')),  -- optional
     status      VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     is_deleted  BOOLEAN DEFAULT FALSE,
     user_id     INTEGER
@@ -1588,6 +1588,342 @@ CREATE TABLE IF NOT EXISTS tbl_delivery_challan_tax_details (
     is_deleted                                      BOOLEAN DEFAULT FALSE
 );
 
+-- PROJECT MANAGEMENT
+-- =====================================================================
+-- SECTION 1: PROJECT MASTER
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project (
+    project_id            SERIAL PRIMARY KEY,
+    project_code          VARCHAR(30) UNIQUE,                 -- generated from document_series, e.g. PROJ/00001
+    project_name          VARCHAR(200) NOT NULL,
+    party_id              INTEGER REFERENCES tbl_party(party_id),         -- customer
+    quotation_id          INTEGER REFERENCES tbl_quotation(quotation_id),
+    sales_order_id        INTEGER REFERENCES tbl_sales_order(sales_order_id),
+    contract_no           VARCHAR(100),
+    customer_po_no        VARCHAR(100),
+    customer_po_date      DATE,
+    project_type          VARCHAR(30) DEFAULT 'other'
+                          CHECK (project_type IN (
+                              'electrical','mechanical','mep','plumbing','piping','hvac',
+                              'fabrication','installation','erection','commissioning',
+                              'maintenance','turnkey','other'
+                          )),
+    project_location      VARCHAR(255),
+    site_address          TEXT,
+    project_manager_id    INTEGER REFERENCES users(user_id),
+    project_engineer_id   INTEGER REFERENCES users(user_id),
+    start_date            DATE,
+    planned_end_date      DATE,
+    actual_end_date       DATE,
+    currency_id           INTEGER REFERENCES currency_mst(currency_id),
+    contract_value        DECIMAL(20,2) DEFAULT 0,
+    estimated_cost        DECIMAL(20,2) DEFAULT 0,            -- material+labour+subcontract+equipment+other (planned)
+    actual_cost           DECIMAL(20,2) DEFAULT 0,            -- rolled up from tbl_project_costs
+    billed_amount         DECIMAL(20,2) DEFAULT 0,            -- rolled up from linked invoices
+    received_amount       DECIMAL(20,2) DEFAULT 0,            -- rolled up from linked payments
+    progress_percent      DECIMAL(5,2) DEFAULT 0,
+    description           TEXT,
+    terms_conditions      TEXT,
+    notes                 TEXT,
+    status                VARCHAR(20) DEFAULT 'planning'
+                          CHECK (status IN (
+                              'planning','approved','in_progress','on_hold','delayed',
+                              'completed','closed','cancelled'
+                          )),
+    is_deleted            BOOLEAN DEFAULT FALSE,
+    user_id               INTEGER,
+    company_id            INTEGER,
+    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_company ON tbl_project(company_id);
+CREATE INDEX IF NOT EXISTS idx_project_party ON tbl_project(party_id);
+CREATE INDEX IF NOT EXISTS idx_project_sales_order ON tbl_project(sales_order_id);
+
+
+-- =====================================================================
+-- SECTION 2: PROJECT SITES (a project can span multiple physical sites)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_sites (
+    site_id            SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    site_name          VARCHAR(150) NOT NULL,
+    address_line1      VARCHAR(255),
+    address_line2      VARCHAR(255),
+    city_id            INTEGER REFERENCES city_mst(city_id),
+    state_id           INTEGER REFERENCES state_mst(state_id),
+    country_id         INTEGER REFERENCES country_mst(country_id),
+    pincode            VARCHAR(10),
+    contact_person     VARCHAR(150),
+    contact_phone      VARCHAR(20),
+    status             VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- =====================================================================
+-- SECTION 3: PROJECT BOQ (Bill of Quantity) - material vs service/labour
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_boq_items (
+    boq_item_id        SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    boq_type           VARCHAR(15) DEFAULT 'material' CHECK (boq_type IN ('material', 'service', 'labour')),
+    item_id            INTEGER REFERENCES tbl_items(item_id),
+    description        VARCHAR(255),
+    quantity           DECIMAL(20,4),
+    unit_id            INTEGER REFERENCES units_of_measure(unit_id),
+    unit_rate          DECIMAL(20,2),
+    total_amount       DECIMAL(20,2),
+    consumed_quantity  DECIMAL(20,4) DEFAULT 0,             -- rolled up from material issues
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_boq_project ON tbl_project_boq_items(project_id);
+
+
+-- =====================================================================
+-- SECTION 4: PROJECT BUDGET / COST CONTROL (Budget vs Actual, per category)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_costs (
+    cost_id            SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    category           VARCHAR(20) CHECK (category IN ('material', 'labour', 'equipment', 'subcontract', 'other')),
+    budget_amount      DECIMAL(20,2) DEFAULT 0,
+    actual_amount      DECIMAL(20,2) DEFAULT 0,
+    remarks            VARCHAR(255),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, category)
+);
+
+
+-- =====================================================================
+-- SECTION 5: PROJECT MILESTONES (also drives RA / milestone billing %)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_milestones (
+    milestone_id       SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    milestone_name     VARCHAR(200) NOT NULL,
+    due_date           DATE,
+    completion_date    DATE,
+    payment_percent    DECIMAL(5,2) DEFAULT 0,
+    payment_amount     DECIMAL(20,2) DEFAULT 0,
+    sort_order         INTEGER DEFAULT 0,
+    status             VARCHAR(15) DEFAULT 'pending'
+                       CHECK (status IN ('pending', 'in_progress', 'completed', 'invoiced')),
+    remarks            VARCHAR(255),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- =====================================================================
+-- SECTION 6: PROJECT TASKS
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_tasks (
+    task_id            SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    site_id            INTEGER REFERENCES tbl_project_sites(site_id),
+    task_name          VARCHAR(200) NOT NULL,
+    assigned_to        INTEGER REFERENCES users(user_id),
+    start_date         DATE,
+    due_date           DATE,
+    priority           VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    progress_percent   DECIMAL(5,2) DEFAULT 0,
+    status             VARCHAR(15) DEFAULT 'pending'
+                       CHECK (status IN ('pending', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled')),
+    remarks            VARCHAR(255),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- =====================================================================
+-- SECTION 7: DAILY PROGRESS REPORT (DPR)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_dpr (
+    dpr_id             SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    site_id            INTEGER REFERENCES tbl_project_sites(site_id),
+    report_date        DATE NOT NULL,
+    weather            VARCHAR(50),
+    manpower_count     INTEGER DEFAULT 0,
+    equipment_used     TEXT,
+    work_completed     TEXT,
+    material_used      TEXT,
+    material_shortage  TEXT,
+    work_planned_next  TEXT,
+    progress_percent   DECIMAL(5,2) DEFAULT 0,
+    issues             TEXT,
+    safety_issues      TEXT,
+    client_instructions TEXT,
+    remarks            TEXT,
+    submitted_by       INTEGER REFERENCES users(user_id),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_dpr_project_date ON tbl_project_dpr(project_id, report_date);
+
+
+-- =====================================================================
+-- SECTION 8: PROJECT DOCUMENTS (contract, PO, BOQ, drawings, photos, ...)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_project_documents (
+    document_id        SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    document_type      VARCHAR(30) DEFAULT 'other'
+                       CHECK (document_type IN (
+                           'contract','po','boq','drawing','specification','quotation',
+                           'purchase_order','grn','inspection_report','test_certificate',
+                           'dpr','site_photo','invoice','payment','handover','completion_certificate','other'
+                       )),
+    document_name      VARCHAR(255) NOT NULL,
+    file_url           VARCHAR(500) NOT NULL,
+    remarks            VARCHAR(255),
+    uploaded_by        INTEGER REFERENCES users(user_id),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+-- =====================================================================
+-- ALTER TABLES
+-- =====================================================================
+
+ALTER TABLE tbl_sales_order        ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+ALTER TABLE tbl_purchase_orders    ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+ALTER TABLE tbl_purchase_invoices  ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+ALTER TABLE tbl_invoice            ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+ALTER TABLE tbl_delivery_challan   ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+ALTER TABLE tbl_proforma           ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES tbl_project(project_id);
+
+
+-- =====================================================================
+-- SECTION 10: PROJECT PROCUREMENT AND MATERIAL MOVEMENT
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS purchase_requisitions (
+    requisition_id SERIAL PRIMARY KEY,
+    requisition_no VARCHAR(30) UNIQUE,
+    requisition_date DATE NOT NULL,
+    project_id INTEGER NOT NULL REFERENCES tbl_project(project_id),
+    required_by DATE,
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','cancelled')),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS purchase_requisition_items (
+    requisition_item_id SERIAL PRIMARY KEY,
+    requisition_id INTEGER NOT NULL REFERENCES purchase_requisitions(requisition_id),
+    item_id INTEGER NOT NULL REFERENCES tbl_items(item_id),
+    description VARCHAR(255),
+    quantity DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id INTEGER REFERENCES units_of_measure(unit_id),
+    notes TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS goods_receipts (
+    grn_id SERIAL PRIMARY KEY,
+    grn_no VARCHAR(30) UNIQUE,
+    grn_date DATE NOT NULL,
+    purchase_order_id INTEGER NOT NULL REFERENCES tbl_purchase_orders(purchase_order_id),
+    project_id INTEGER REFERENCES tbl_project(project_id),
+    warehouse_id INTEGER NOT NULL REFERENCES warehouse_mst(warehouse_id),
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','cancelled')),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS goods_receipt_items (
+    grn_item_id SERIAL PRIMARY KEY,
+    grn_id INTEGER NOT NULL REFERENCES goods_receipts(grn_id),
+    purchase_order_item_id INTEGER REFERENCES tbl_purchase_order_items(purchase_order_item_id),
+    item_id INTEGER NOT NULL REFERENCES tbl_items(item_id),
+    batch_id INTEGER REFERENCES item_batches(batch_id),
+    quantity DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id INTEGER REFERENCES units_of_measure(unit_id),
+    rate DECIMAL(20,2),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS site_issues (
+    issue_id SERIAL PRIMARY KEY,
+    issue_no VARCHAR(30) UNIQUE,
+    issue_date DATE NOT NULL,
+    project_id INTEGER NOT NULL REFERENCES tbl_project(project_id),
+    site_id INTEGER NOT NULL REFERENCES tbl_project_sites(site_id),
+    warehouse_id INTEGER NOT NULL REFERENCES warehouse_mst(warehouse_id),
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','cancelled')),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS site_issue_items (
+    issue_item_id SERIAL PRIMARY KEY,
+    issue_id INTEGER NOT NULL REFERENCES site_issues(issue_id),
+    item_id INTEGER NOT NULL REFERENCES tbl_items(item_id),
+    batch_id INTEGER REFERENCES item_batches(batch_id),
+    quantity DECIMAL(20,4) NOT NULL CHECK (quantity > 0),
+    unit_id INTEGER REFERENCES units_of_measure(unit_id),
+    boq_item_id INTEGER REFERENCES tbl_project_boq_items(boq_item_id),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INTEGER,
+    company_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- =====================================================================
 -- INDEXES - the columns you'll filter/join on constantly
@@ -1633,6 +1969,17 @@ CREATE INDEX IF NOT EXISTS idx_quotation_party ON tbl_quotation(party_id);
 CREATE INDEX IF NOT EXISTS idx_proforma_party ON tbl_proforma(party_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_challan_party ON tbl_delivery_challan(party_id);
 
+CREATE INDEX IF NOT EXISTS idx_sales_order_project ON tbl_sales_order(project_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_project ON tbl_purchase_orders(project_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_invoice_project ON tbl_purchase_invoices(project_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_project ON tbl_invoice(project_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_challan_project ON tbl_delivery_challan(project_id);
+CREATE INDEX IF NOT EXISTS idx_proforma_project ON tbl_proforma(project_id);
+
+CREATE INDEX IF NOT EXISTS idx_requisitions_project ON purchase_requisitions(project_id);
+CREATE INDEX IF NOT EXISTS idx_goods_receipts_po ON goods_receipts(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_site_issues_project ON site_issues(project_id);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_one_current_fy ON financial_years (is_current) WHERE is_current = TRUE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_permissions_name_company ON permissions (permission_name, company_id);
@@ -1641,3 +1988,7 @@ CREATE INDEX IF NOT EXISTS idx_user_permissions_permission ON user_permissions(p
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_active_unique ON users (email) WHERE is_deleted = FALSE;
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_active_unique ON users (phone) WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_company ON role_permissions(role_id, company_id);
+CREATE INDEX IF NOT EXISTS idx_user_permissions_user_company ON user_permissions(user_id, company_id);
+CREATE INDEX IF NOT EXISTS idx_permissions_company_permission ON permissions(company_id, permission_id);
