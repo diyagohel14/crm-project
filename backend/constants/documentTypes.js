@@ -22,6 +22,9 @@ export const DEFAULT_DOCUMENT_TYPES = [
   { document_type_name: "GRN", document_type_id: 18 },
   { document_type_name: "Site Issue", document_type_id: 19 },
   { document_type_name: "Stock In", document_type_id: 20 },
+  { document_type_name: "Lead", document_type_id: 21 },
+  { document_type_name: "Enquiry", document_type_id: 22 },
+  { document_type_name: "Equipment", document_type_id: 23 },
 
 ]
 
@@ -47,6 +50,9 @@ export const DOCUMENT_TYPES = {
   GRN: 18,
   SITE_ISSUE: 19,
   STOCK_IN: 20,
+  LEAD: 21,
+  ENQUIRY: 22,
+  EQUIPMENT: 23,
 
 };
 
@@ -70,6 +76,9 @@ export const DOCUMENT_SERIES = [
   { document_type_id: 17, prefix: "REQ/", postfix: "", financial_year_id: "", padding_length: 5 },
   { document_type_id: 18, prefix: "GRN/", postfix: "", financial_year_id: "", padding_length: 5 },
   { document_type_id: 19, prefix: "ISSUE/", postfix: "", financial_year_id: "", padding_length: 5 },
-  { document_type_id: 20, prefix: "STOCK/", postfix: "", financial_year_id: "", padding_length: 5 }
+  { document_type_id: 20, prefix: "STOCK/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 21, prefix: "LEAD/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 22, prefix: "ENQ/", postfix: "", financial_year_id: "", padding_length: 5 },
+  { document_type_id: 23, prefix: "EQP/", postfix: "", financial_year_id: "", padding_length: 5 }
 
 ]

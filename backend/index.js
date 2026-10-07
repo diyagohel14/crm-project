@@ -18,6 +18,11 @@ import debitNoteRoutes from "./routes/debitNoteRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import procurementRoutes from "./routes/procurementRoutes.js";
+import leadRoutes from "./routes/leadRoutes.js";
+import enquiryRoutes from "./routes/enquiryRoutes.js";
+import crmRoutes from "./routes/crmRoutes.js";
+import manpowerRoutes from "./routes/manpowerRoutes.js";
+import equipmentRoutes from "./routes/equipmentRoutes.js";
 import { getAppConfig } from "./utils/env.js";
 
 const config = getAppConfig();
@@ -43,6 +48,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/master", masterRoutes);
 app.use("/api/party", partyRoutes);
 app.use("/api/items", itemsRoutes);
+app.use("/api/crm", crmRoutes); // lead sources, industries, follow-ups
+app.use("/api/lead", leadRoutes); // Lead -> (convert) -> Customer
+app.use("/api/enquiry", enquiryRoutes); // Enquiry -> Quotation -> Sales Order -> Project
 app.use("/api/quotation", quotationRoutes);
 app.use("/api/sales_order", salesorderRoutes);
 app.use("/api/project", projectRoutes); // Project is the central object: Quotation -> Sales Order -> Project -> Procurement -> Site Execution -> Billing
@@ -55,6 +63,8 @@ app.use("/api/purchase_invoice", purchaseInvoiceRoutes);
 app.use("/api/credit_note", creditNoteRoutes);
 app.use("/api/debit_note", debitNoteRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/manpower", manpowerRoutes); // labour trades + project manpower cost logs
+app.use("/api/equipment", equipmentRoutes); // equipment register + project equipment cost logs
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 

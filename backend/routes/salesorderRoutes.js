@@ -3,7 +3,7 @@ import { Router } from "express";
 import {
     getSalesOrders, createSalesOrder, updateSalesOrder, deleteSalesOrder, deleteSalesOrderItems, changeStatus
 } from "../controllers/salesorderController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 

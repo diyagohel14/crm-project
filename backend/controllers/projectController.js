@@ -314,6 +314,13 @@ export async function createProject(req, res) {
             return res.status(400).json({ success: false, message: `Sales Order must be approved/confirmed before creating a project (current status: '${salesOrder.status}')` });
         }
 
+        if (payload.quotation_id !== undefined && payload.quotation_id !== null && String(payload.quotation_id).trim() !== "") {
+            if(payload.quotation_id !== soRes.rows[0].quotation_id){
+                await client.query("ROLLBACK");
+                return res.status(400).json({ success: false, message: `Selected Quotation are not match with SalesOrder's Quotation` })
+            }
+        }
+
         const insertProjectSql = `INSERT INTO tbl_project (
             project_code, project_name, party_id, quotation_id, sales_order_id,
             contract_no, customer_po_no, customer_po_date, project_type, project_location,

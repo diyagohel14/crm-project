@@ -22,6 +22,29 @@ test("getAppConfig provides safe defaults when env values are missing", () => {
     process.env = previousEnv;
   }
 });
+
+test("getAppConfig rejects missing production secrets and database credentials", () => {
+  const keys = [
+    "NODE_ENV", "SESSION_SECRET", "JWT_SECRET", "JWT_ACCESS_SECRET", "APP_ENCRYPTION_KEY",
+    "ADMIN_DB_HOST", "ADMIN_DB_NAME", "ADMIN_DB_USER", "ADMIN_DB_PASSWORD",
+    "PG_MAINTENANCE_HOST", "PG_MAINTENANCE_USER", "PG_MAINTENANCE_PASSWORD",
+  ];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+
+  try {
+    process.env.NODE_ENV = "production";
+    for (const key of keys) {
+      if (key !== "NODE_ENV") delete process.env[key];
+    }
+    assert.throws(() => getAppConfig(), /SESSION_SECRET/);
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+});
+
 test("resolveFinancialYearPayload auto-selects the current fiscal year", () => {
   const payload = resolveFinancialYearPayload({}, new Date("2026-08-01"));
 

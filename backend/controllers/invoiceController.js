@@ -139,17 +139,18 @@ export async function createSalesInvoice(req, res) {
         const invoiceNo = seriesResult.series;
 
         const insertInvoiceSql = `INSERT INTO tbl_invoice (
-            invoice_no, party_id, invoice_date, due_date, po_no, po_date,
+            invoice_no, party_id, project_id, invoice_date, due_date, po_no, po_date,
             billing_address_id, shipping_address_id, payment_term_id, currency_id,
             subtotal_amount, discount_value, total_tax_amount,
             shipping_charges, round_off, total_amount, paid_amount, balance_due,
             terms_conditions, notes, status, user_id, company_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
         RETURNING *`;
 
         const invoiceParams = [
             invoiceNo,
             payload.party_id,
+            payload.project_id || null,
             payload.invoice_date,
             payload.due_date || null,
             payload.po_no || null,
@@ -286,16 +287,17 @@ export async function updateSalesInvoice(req, res) {
         }
 
         const updateInvoiceSql = `UPDATE tbl_invoice SET
-            party_id = $1, invoice_date = $2, due_date = $3, po_no = $4, po_date = $5,
-            billing_address_id = $6, shipping_address_id = $7, payment_term_id = $8, currency_id = $9,
-            subtotal_amount = $10, discount_value = $11, total_tax_amount = $12,
-            shipping_charges = $13, round_off = $14, total_amount = $15, paid_amount = $16, balance_due = $17,
-            terms_conditions = $18, notes = $19, status = $20, updated_at = CURRENT_TIMESTAMP
-            WHERE invoice_id = $21 AND is_deleted = FALSE AND company_id = $22
+            party_id = $1, project_id = $2, invoice_date = $3, due_date = $4, po_no = $5, po_date = $6,
+            billing_address_id = $7, shipping_address_id = $8, payment_term_id = $9, currency_id = $10,
+            subtotal_amount = $11, discount_value = $12, total_tax_amount = $13,
+            shipping_charges = $14, round_off = $15, total_amount = $16, paid_amount = $17, balance_due = $18,
+            terms_conditions = $19, notes = $20, status = $21, updated_at = CURRENT_TIMESTAMP
+            WHERE invoice_id = $22 AND is_deleted = FALSE AND company_id = $23
             RETURNING *`;
 
         const invoiceParams = [
             payload.party_id,
+            payload.project_id || null,
             payload.invoice_date,
             payload.due_date || null,
             payload.po_no || null,

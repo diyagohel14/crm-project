@@ -3,11 +3,11 @@ import { Router } from "express";
 import {
     getPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, deletePurchaseOrderItems, changeStatus
 } from "../controllers/purchaseorderController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-//SALES INVOICE 
+//PURCHASE ORDER
 router.get("/", requireAuth, 
     requirePermission("purchase_order:view"), 
     getPurchaseOrders);  //133

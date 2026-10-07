@@ -4,7 +4,7 @@ import { Router } from "express";
 import {
     getDeliveryChallans, createDeliveryChallan, updateDeliveryChallan, deleteDeliveryChallan, deleteDeliveryChallanItems, changeStatus
 } from "../controllers/deliverychallanController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 

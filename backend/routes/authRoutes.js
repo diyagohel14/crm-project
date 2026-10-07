@@ -4,7 +4,7 @@ import {
     loginController, logoutController, meController, updatemeController, viewUser, createSubUser, updateSubUser, deleteSubUser, changePassword,
     viewRoles, createRoles, updateRoles, deleteRoles, listPermissions, createPermission, listRolePermissions, updateRolePermissions, listUserPermissions, updateUserPermissions
 } from "../controllers/authController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 

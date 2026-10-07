@@ -7,6 +7,7 @@ import { DOCUMENT_TYPES } from "../constants/documentTypes.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import { logAudit } from "../services/authService.js";
 import { deleteModule, priceCalculationFromDatabase, num } from "../services/commonService.js"
+import { linkQuotationToEnquiry } from "../services/enquiryService.js";
 
 export function resolveQuotationItemLink(insertedItemIds = [], taxDetail = {}) {
     if (!Array.isArray(insertedItemIds)) return null;
@@ -170,6 +171,12 @@ export async function createQuotation(req, res) {
 
         const quotationRes = await client.query(insertQuotationSql, quotationParams);
         const quotationId = quotationRes.rows[0].quotation_id;
+
+        // Answering an enquiry: link it and move the enquiry on to 'quoted'.
+        if (payload.enquiry_id) {
+            const { enquiry } = await linkQuotationToEnquiry(client, { enquiryId: payload.enquiry_id, quotationId, companyId });
+            quotationRes.rows[0].enquiry_id = enquiry.enquiry_id;
+        }
 
         const insertedItemIds = [];
         const insertedItems = [];

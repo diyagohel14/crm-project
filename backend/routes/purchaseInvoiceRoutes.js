@@ -3,7 +3,7 @@ import { Router } from "express";
 import {
     getPurchaseInvoices, createPurchaseInvoice, updatePurchaseInvoice, deletePurchaseInvoice, deletePurchaseInvoiceItems, changeStatus
 } from "../controllers/purchaseInvoiceController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 

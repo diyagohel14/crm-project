@@ -13,6 +13,33 @@ function quantity(value) {
     return result;
 }
 
+export function validateGoodsReceiptItems(items, purchaseOrderItems) {
+    const purchaseOrderItemsById = new Map(
+        purchaseOrderItems.map((item) => [Number(item.purchase_order_item_id), item])
+    );
+    const receivedQuantities = new Map();
+
+    for (const item of items) {
+        const purchaseOrderItemId = Number(item.purchase_order_item_id);
+        if (!Number.isInteger(purchaseOrderItemId) || purchaseOrderItemId <= 0) {
+            throw Object.assign(new Error("Each GRN item must reference a Purchase Order item"), { status: 400 });
+        }
+        const purchaseOrderItem = purchaseOrderItemsById.get(purchaseOrderItemId);
+        if (!purchaseOrderItem) {
+            throw Object.assign(new Error("GRN item is not linked to this Purchase Order"), { status: 400 });
+        }
+        if (Number(item.item_id) !== Number(purchaseOrderItem.item_id)) {
+            throw Object.assign(new Error("GRN item does not match its Purchase Order item"), { status: 400 });
+        }
+        receivedQuantities.set(
+            purchaseOrderItemId,
+            (receivedQuantities.get(purchaseOrderItemId) || 0) + Number(item.quantity)
+        );
+    }
+
+    return receivedQuantities;
+}
+
 async function validateItems(client, items, companyId) {
     if (!Array.isArray(items) || items.length === 0) {
         throw Object.assign(new Error("At least one item is required"), { status: 400 });
@@ -190,6 +217,17 @@ export async function createGoodsReceipt(req, res) {
         if (!po.rows.length) throw Object.assign(new Error("Purchase Order not found"), { status: 404 });
         if (!["approved", "sent", "confirmed", "processing", "partially_received"].includes(po.rows[0].status)) throw Object.assign(new Error("Purchase Order is not ready for receiving"), { status: 409 });
         if (po.rows[0].project_id) await requireProject(client, po.rows[0].project_id, companyId);
+        const purchaseOrderItemIds = [...new Set(payload.itemsDetails.map((item) => Number(item.purchase_order_item_id)))];
+        if (purchaseOrderItemIds.some((itemId) => !Number.isInteger(itemId) || itemId <= 0)) {
+            throw Object.assign(new Error("Each GRN item must reference a Purchase Order item"), { status: 400 });
+        }
+        const purchaseOrderItems = await client.query(
+            `SELECT purchase_order_item_id, item_id FROM tbl_purchase_order_items
+             WHERE purchase_order_id = $1 AND purchase_order_item_id = ANY($2::int[])
+             AND is_deleted = FALSE`,
+            [payload.purchase_order_id, purchaseOrderItemIds]
+        );
+        validateGoodsReceiptItems(payload.itemsDetails, purchaseOrderItems.rows);
         const warehouse = await client.query(`SELECT warehouse_id FROM warehouse_mst WHERE warehouse_id = $1 AND company_id = $2 AND is_deleted = FALSE AND status = 'active'`, [payload.warehouse_id, companyId]);
         if (!warehouse.rows.length) throw Object.assign(new Error("Warehouse is invalid or inactive"), { status: 400 });
         const header = await client.query(
@@ -245,15 +283,40 @@ export async function approveGoodsReceipt(req, res) {
         if (!allowed[current]?.includes(status)) throw Object.assign(new Error(`GRN status cannot change from '${current}' to '${status}'`), { status: 400 });
 
         if (status === "approved") {
+            await client.query(
+                `SELECT purchase_order_id FROM tbl_purchase_orders
+                 WHERE purchase_order_id = $1 AND company_id = $2 AND is_deleted = FALSE FOR UPDATE`,
+                [grn.rows[0].purchase_order_id, companyId]
+            );
             const items = await client.query(`SELECT * FROM goods_receipt_items WHERE grn_id = $1 AND is_deleted = FALSE`, [req.params.grnId]);
             if (!items.rows.length) throw Object.assign(new Error("A GRN must contain at least one item"), { status: 400 });
-            for (const item of items.rows) {
-                if (item.purchase_order_item_id) {
-                    const ordered = await client.query(`SELECT quantity FROM tbl_purchase_order_items WHERE purchase_order_item_id = $1 AND purchase_order_id = $2 AND is_deleted = FALSE`, [item.purchase_order_item_id, grn.rows[0].purchase_order_id]);
-                    if (!ordered.rows.length) throw Object.assign(new Error("GRN item is not linked to this Purchase Order"), { status: 400 });
-                    const received = await client.query(`SELECT COALESCE(SUM(quantity), 0) AS quantity FROM goods_receipt_items gi JOIN goods_receipts g ON g.grn_id = gi.grn_id WHERE gi.purchase_order_item_id = $1 AND g.status = 'approved' AND gi.is_deleted = FALSE`, [item.purchase_order_item_id]);
-                    if (Number(received.rows[0].quantity) + Number(item.quantity) > Number(ordered.rows[0].quantity)) throw Object.assign(new Error("GRN quantity exceeds the Purchase Order quantity"), { status: 409 });
+            const purchaseOrderItemIds = [...new Set(items.rows.map((item) => Number(item.purchase_order_item_id)))];
+            if (purchaseOrderItemIds.some((itemId) => !Number.isInteger(itemId) || itemId <= 0)) {
+                throw Object.assign(new Error("Each GRN item must reference a Purchase Order item"), { status: 400 });
+            }
+            const purchaseOrderItems = await client.query(
+                `SELECT purchase_order_item_id, item_id, quantity FROM tbl_purchase_order_items
+                 WHERE purchase_order_id = $1 AND purchase_order_item_id = ANY($2::int[])
+                 AND is_deleted = FALSE FOR UPDATE`,
+                [grn.rows[0].purchase_order_id, purchaseOrderItemIds]
+            );
+            const receiptQuantities = validateGoodsReceiptItems(items.rows, purchaseOrderItems.rows);
+            const received = await client.query(
+                `SELECT gi.purchase_order_item_id, COALESCE(SUM(gi.quantity), 0) AS quantity
+                 FROM goods_receipt_items gi
+                 JOIN goods_receipts g ON g.grn_id = gi.grn_id
+                 WHERE gi.purchase_order_item_id = ANY($1::int[]) AND g.status = 'approved'
+                 AND gi.is_deleted = FALSE GROUP BY gi.purchase_order_item_id`,
+                [purchaseOrderItemIds]
+            );
+            const alreadyReceived = new Map(received.rows.map((row) => [Number(row.purchase_order_item_id), Number(row.quantity)]));
+            for (const purchaseOrderItem of purchaseOrderItems.rows) {
+                const itemId = Number(purchaseOrderItem.purchase_order_item_id);
+                if ((alreadyReceived.get(itemId) || 0) + receiptQuantities.get(itemId) > Number(purchaseOrderItem.quantity)) {
+                    throw Object.assign(new Error("GRN quantity exceeds the Purchase Order quantity"), { status: 409 });
                 }
+            }
+            for (const item of items.rows) {
                 await client.query(`INSERT INTO stock_ledger (item_id, warehouse_id, batch_id, txn_date, txn_type, txn_source, source_id, source_item_id, quantity, unit_id, rate, remarks, user_id, company_id) VALUES ($1,$2,$3,$4,'IN','GRN',$5,$6,$7,$8,$9,$10,$11,$12)`, [item.item_id, grn.rows[0].warehouse_id, item.batch_id, grn.rows[0].grn_date, grn.rows[0].grn_id, item.grn_item_id, item.quantity, item.unit_id, item.rate, grn.rows[0].notes, userId, companyId]);
             }
             const updated = await client.query(`UPDATE goods_receipts SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE grn_id = $1 RETURNING *`, [req.params.grnId]);

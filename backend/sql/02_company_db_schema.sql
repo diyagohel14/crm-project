@@ -1992,3 +1992,288 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_phone_active_unique ON users (phone) WHE
 CREATE INDEX IF NOT EXISTS idx_role_permissions_role_company ON role_permissions(role_id, company_id);
 CREATE INDEX IF NOT EXISTS idx_user_permissions_user_company ON user_permissions(user_id, company_id);
 CREATE INDEX IF NOT EXISTS idx_permissions_company_permission ON permissions(company_id, permission_id);
+
+
+-- >>> module:crm_pipeline
+-- =====================================================================
+-- SECTION: CRM PRE-AWARD  (Lead -> Enquiry -> Quotation)
+--
+--   tbl_lead     a prospective client, not yet in tbl_party
+--   tbl_enquiry  one specific piece of work being asked for (a bid /
+--                RFQ / tender). Belongs to a lead OR to an existing
+--                customer, so repeat customers skip the lead step.
+--   tbl_crm_activity    calls / meetings / site visits / notes on either
+--   tbl_enquiry_documents  RFQ, drawings, specs, tender documents
+--
+-- Converting a lead creates a tbl_party (CUSTOMER) and back-fills
+-- party_id on the lead's enquiries, which is what allows a quotation.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS tbl_lead (
+    lead_id              SERIAL PRIMARY KEY,
+    lead_no              VARCHAR(30) UNIQUE,                  -- generated from document_series, e.g. LEAD/00001
+    company_name         VARCHAR(200) NOT NULL,
+    contact_name         VARCHAR(150),
+    designation          VARCHAR(100),
+    phone                VARCHAR(20),
+    email                VARCHAR(150),
+    website              VARCHAR(100),
+    gst_no               VARCHAR(100),
+    industry_id          INTEGER REFERENCES industries(industry_id),
+    lead_source_id       INTEGER REFERENCES lead_sources(lead_source_id),
+    referred_by          VARCHAR(150),
+    referred_by          VARCHAR(255),
+    address_line2        VARCHAR(255),
+    city_id              INTEGER REFERENCES city_mst(city_id),
+    state_id             INTEGER REFERENCES state_mst(state_id),
+    country_id           INTEGER REFERENCES country_mst(country_id),
+    pincode              VARCHAR(10),
+    assigned_to          INTEGER REFERENCES users(user_id),
+    rating               VARCHAR(10) DEFAULT 'warm' CHECK (rating IN ('cold', 'warm', 'hot')),
+    estimated_value      DECIMAL(20,2) DEFAULT 0,
+    next_follow_up_date  DATE,                                -- rolled up from the latest activity
+    last_contacted_at    TIMESTAMP,
+    status               VARCHAR(15) DEFAULT 'new'
+                         CHECK (status IN ('new', 'contacted', 'qualified', 'lost', 'converted')),
+    lost_reason          VARCHAR(255),
+    party_id             INTEGER REFERENCES tbl_party(party_id),   -- set when converted to a customer
+    converted_at         TIMESTAMP,
+    notes                TEXT,
+    is_deleted           BOOLEAN DEFAULT FALSE,
+    user_id              INTEGER,
+    company_id           INTEGER,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tbl_enquiry (
+    enquiry_id             SERIAL PRIMARY KEY,
+    enquiry_no             VARCHAR(30) UNIQUE,                -- generated from document_series, e.g. ENQ/00001
+    enquiry_date           DATE NOT NULL DEFAULT CURRENT_DATE,
+    lead_id                INTEGER REFERENCES tbl_lead(lead_id),
+    party_id               INTEGER REFERENCES tbl_party(party_id),    -- customer; required before a quotation
+    contact_name           VARCHAR(150),
+    contact_phone          VARCHAR(20),
+    contact_email          VARCHAR(150),
+    enquiry_title          VARCHAR(200) NOT NULL,
+    project_type           VARCHAR(30) DEFAULT 'other'
+                           CHECK (project_type IN (
+                               'electrical','mechanical','mep','plumbing','piping','hvac',
+                               'fabrication','installation','erection','commissioning',
+                               'maintenance','turnkey','other'
+                           )),                                -- same list as tbl_project
+    industry_id            INTEGER REFERENCES industries(industry_id),
+    lead_source_id         INTEGER REFERENCES lead_sources(lead_source_id),
+    customer_ref_no        VARCHAR(100),                      -- the client's own RFQ / enquiry number
+    plant_name             VARCHAR(150),
+    project_location       VARCHAR(255),
+    site_address           TEXT,
+    scope_of_work          TEXT,
+    is_tender              BOOLEAN DEFAULT FALSE,
+    tender_no              VARCHAR(100),
+    submission_due_date    DATE,                              -- last date to submit the quotation / bid
+    prebid_meeting_date    DATE,
+    emd_amount             DECIMAL(20,2) DEFAULT 0,           -- earnest money deposit, if a tender
+    site_visit_required    BOOLEAN DEFAULT FALSE,
+    site_visit_date        DATE,
+    expected_start_date    DATE,
+    expected_end_date      DATE,
+    currency_id            INTEGER REFERENCES currency_mst(currency_id),
+    estimated_value        DECIMAL(20,2) DEFAULT 0,
+    priority               VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    assigned_to            INTEGER REFERENCES users(user_id),         -- sales owner
+    estimator_id           INTEGER REFERENCES users(user_id),         -- prepares BOQ / costing
+    next_follow_up_date    DATE,                              -- rolled up from the latest activity
+    status                 VARCHAR(15) DEFAULT 'new'
+                           CHECK (status IN (
+                               'new','under_review','site_visit','estimating','quoted',
+                               'negotiation','won','lost','no_bid','on_hold','cancelled'
+                           )),
+    lost_reason            VARCHAR(255),
+    competitor_name        VARCHAR(150),                      -- who won it, when status = lost
+    notes                  TEXT,
+    is_deleted             BOOLEAN DEFAULT FALSE,
+    user_id                INTEGER,
+    company_id             INTEGER,
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (lead_id IS NOT NULL OR party_id IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_crm_activity (
+    activity_id            SERIAL PRIMARY KEY,
+    lead_id                INTEGER REFERENCES tbl_lead(lead_id),
+    enquiry_id             INTEGER REFERENCES tbl_enquiry(enquiry_id),
+    activity_type          VARCHAR(15) DEFAULT 'note'
+                           CHECK (activity_type IN ('call', 'meeting', 'email', 'whatsapp', 'site_visit', 'note')),
+    activity_date          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    subject                VARCHAR(200),
+    outcome                TEXT,
+    next_follow_up_date    DATE,
+    done_by                INTEGER REFERENCES users(user_id),
+    is_deleted             BOOLEAN DEFAULT FALSE,
+    user_id                INTEGER,
+    company_id             INTEGER,
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (lead_id IS NOT NULL OR enquiry_id IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_enquiry_documents (
+    document_id            SERIAL PRIMARY KEY,
+    enquiry_id             INTEGER REFERENCES tbl_enquiry(enquiry_id),
+    document_type          VARCHAR(30) DEFAULT 'other'
+                           CHECK (document_type IN (
+                               'rfq','tender_document','drawing','specification','boq',
+                               'site_photo','correspondence','other'
+                           )),
+    document_name          VARCHAR(255) NOT NULL,
+    file_url               VARCHAR(500) NOT NULL,
+    remarks                VARCHAR(255),
+    uploaded_by            INTEGER REFERENCES users(user_id),
+    is_deleted             BOOLEAN DEFAULT FALSE,
+    user_id                INTEGER,
+    company_id             INTEGER,
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- A quotation can point back at the enquiry it answers.
+ALTER TABLE tbl_quotation ADD COLUMN IF NOT EXISTS enquiry_id INTEGER REFERENCES tbl_enquiry(enquiry_id);
+
+CREATE INDEX IF NOT EXISTS idx_lead_company_status ON tbl_lead(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_lead_assigned ON tbl_lead(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_lead_follow_up ON tbl_lead(next_follow_up_date);
+CREATE INDEX IF NOT EXISTS idx_lead_party ON tbl_lead(party_id);
+
+CREATE INDEX IF NOT EXISTS idx_enquiry_company_status ON tbl_enquiry(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_enquiry_party ON tbl_enquiry(party_id);
+CREATE INDEX IF NOT EXISTS idx_enquiry_lead ON tbl_enquiry(lead_id);
+CREATE INDEX IF NOT EXISTS idx_enquiry_assigned ON tbl_enquiry(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_enquiry_due ON tbl_enquiry(submission_due_date);
+CREATE INDEX IF NOT EXISTS idx_enquiry_follow_up ON tbl_enquiry(next_follow_up_date);
+CREATE INDEX IF NOT EXISTS idx_quotation_enquiry ON tbl_quotation(enquiry_id);
+
+CREATE INDEX IF NOT EXISTS idx_crm_activity_lead ON tbl_crm_activity(lead_id, activity_date);
+CREATE INDEX IF NOT EXISTS idx_crm_activity_enquiry ON tbl_crm_activity(enquiry_id, activity_date);
+CREATE INDEX IF NOT EXISTS idx_enquiry_documents_enquiry ON tbl_enquiry_documents(enquiry_id);
+
+-- Starter values for the (previously empty) CRM masters. Safe to re-run.
+INSERT INTO lead_sources (source_name)
+SELECT v FROM (VALUES ('Website'), ('Referral'), ('Existing customer'), ('Tender portal'),
+                      ('Cold call'), ('Walk-in'), ('Exhibition'), ('Email / WhatsApp')) AS s(v)
+WHERE NOT EXISTS (SELECT 1 FROM lead_sources ls WHERE ls.source_name = s.v);
+
+INSERT INTO industries (industry_name)
+SELECT v FROM (VALUES ('Chemical'), ('Pharmaceutical'), ('Textile'), ('Engineering / Manufacturing'),
+                      ('Food processing'), ('Real estate / Commercial'), ('Power / Utilities'),
+                      ('Oil, gas & petrochemical')) AS s(v)
+WHERE NOT EXISTS (SELECT 1 FROM industries i WHERE i.industry_name = s.v);
+
+
+-- >>> module:manpower_equipment
+-- =====================================================================
+-- SECTION: MANPOWER & EQUIPMENT COSTING
+--
+--   labour_trade_mst / equipment_mst    the two registers
+--   tbl_project_manpower_log            one row per project/trade/day
+--   tbl_project_equipment_log           one row per project/equipment/day
+--
+-- Every log write recalculates two things (see costingService.js):
+--   tbl_project_costs.actual_amount     for category 'labour' or 'equipment'
+--   tbl_project.actual_cost             sum of ALL tbl_project_costs rows
+-- so project cost control finally reflects real postings instead of a
+-- number nobody ever updates.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS labour_trade_mst (
+    trade_id      SERIAL PRIMARY KEY,
+    trade_name    VARCHAR(100) UNIQUE NOT NULL,
+    status        VARCHAR(10) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    is_deleted    BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS equipment_mst (
+    equipment_id     SERIAL PRIMARY KEY,
+    equipment_code    VARCHAR(30) UNIQUE,                     -- generated from document_series, e.g. EQP/00001
+    equipment_name    VARCHAR(150) NOT NULL,
+    equipment_type    VARCHAR(20) DEFAULT 'other'
+                      CHECK (equipment_type IN (
+                          'crane', 'welding_machine', 'generator', 'compressor', 'lifting_equipment',
+                          'excavator', 'forklift', 'testing_equipment', 'vehicle', 'other'
+                      )),
+    ownership         VARCHAR(10) DEFAULT 'owned' CHECK (ownership IN ('owned', 'rented')),
+    vendor_id         INTEGER REFERENCES tbl_party(party_id),  -- rental vendor, if ownership = 'rented'
+    rate_per_hour     DECIMAL(20,2) DEFAULT 0,
+    rate_per_day      DECIMAL(20,2) DEFAULT 0,
+    status            VARCHAR(20) DEFAULT 'active'
+                      CHECK (status IN ('active', 'under_maintenance', 'retired')),
+    notes             VARCHAR(255),
+    is_deleted        BOOLEAN DEFAULT FALSE,
+    user_id           INTEGER,
+    company_id        INTEGER,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tbl_project_manpower_log (
+    manpower_log_id    SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    site_id            INTEGER REFERENCES tbl_project_sites(site_id),
+    log_date           DATE NOT NULL,
+    trade_id           INTEGER REFERENCES labour_trade_mst(trade_id),
+    headcount          INTEGER NOT NULL CHECK (headcount > 0),
+    regular_hours      DECIMAL(6,2) NOT NULL DEFAULT 8 CHECK (regular_hours >= 0),
+    overtime_hours     DECIMAL(6,2) NOT NULL DEFAULT 0 CHECK (overtime_hours >= 0),
+    rate_per_hour      DECIMAL(20,2) NOT NULL CHECK (rate_per_hour >= 0),
+    ot_rate_per_hour   DECIMAL(20,2),                          -- defaults to 1.5x rate_per_hour if not given
+    -- headcount * (regular_hours*rate_per_hour + overtime_hours*ot_rate_per_hour), kept in
+    -- sync by the application rather than a GENERATED column so a future rate correction
+    -- on an existing row recalculates it the same way a new row would.
+    total_cost         DECIMAL(20,2) NOT NULL DEFAULT 0,
+    subcontractor_id   INTEGER REFERENCES tbl_party(party_id),  -- set when this is subcontracted labour, not direct
+    remarks            VARCHAR(255),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tbl_project_equipment_log (
+    equipment_log_id   SERIAL PRIMARY KEY,
+    project_id         INTEGER REFERENCES tbl_project(project_id),
+    site_id            INTEGER REFERENCES tbl_project_sites(site_id),
+    equipment_id       INTEGER REFERENCES equipment_mst(equipment_id),
+    log_date           DATE NOT NULL,
+    hours_used         DECIMAL(6,2) NOT NULL CHECK (hours_used > 0 AND hours_used <= 24),
+    rate_per_hour      DECIMAL(20,2) NOT NULL CHECK (rate_per_hour >= 0),  -- snapshot from equipment_mst, overridable
+    fuel_cost          DECIMAL(20,2) DEFAULT 0 CHECK (fuel_cost >= 0),
+    operator_name      VARCHAR(150),
+    -- hours_used*rate_per_hour + fuel_cost, kept in sync by the application (see total_cost note above)
+    total_cost         DECIMAL(20,2) NOT NULL DEFAULT 0,
+    remarks            VARCHAR(255),
+    is_deleted         BOOLEAN DEFAULT FALSE,
+    user_id            INTEGER,
+    company_id         INTEGER,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Partial + expression indexes: COALESCE lets NULL subcontractor_id still collide (a
+-- plain UNIQUE column treats every NULL as distinct, so it would never catch a duplicate
+-- direct-labour entry); the is_deleted filter lets a deleted line's slot be reused.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_manpower_log_unique
+    ON tbl_project_manpower_log (project_id, log_date, trade_id, COALESCE(subcontractor_id, 0))
+    WHERE is_deleted = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_equipment_log_unique
+    ON tbl_project_equipment_log (project_id, equipment_id, log_date)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_manpower_log_project_date ON tbl_project_manpower_log(project_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_equipment_log_project_date ON tbl_project_equipment_log(project_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_equipment_log_equipment ON tbl_project_equipment_log(equipment_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_equipment_company ON equipment_mst(company_id);
+
+INSERT INTO labour_trade_mst (trade_name)
+SELECT v FROM (VALUES ('Electrician'), ('Fitter'), ('Welder'), ('Supervisor'), ('Engineer'),
+                      ('Helper'), ('Mason'), ('Rigger'), ('Painter'), ('Plumber')) AS s(v)
+WHERE NOT EXISTS (SELECT 1 FROM labour_trade_mst t WHERE t.trade_name = s.v);

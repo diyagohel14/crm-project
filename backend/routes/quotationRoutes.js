@@ -4,7 +4,7 @@ import { Router } from "express";
 import {
     getQuotations, createQuotation, updateQuotation, deleteQuotation, deleteQuotationItems, changeStatus
 } from "../controllers/quotationController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 

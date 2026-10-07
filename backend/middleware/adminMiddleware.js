@@ -33,3 +33,11 @@ export function requireAdmin(req, res, next) {
 
   next();
 }
+
+export function optionalAdmin(req, res, next) {
+  if (!req.get("authorization")) {
+    return next();
+  }
+
+  return requireAdmin(req, res, next);
+}

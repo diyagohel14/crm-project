@@ -31,11 +31,30 @@ export async function registerAdmin(req, res) {
 
   try {
     const hashedPassword = await hashPassword(password);
-    const result = await adminPool.query(
-      `INSERT INTO admins (full_name, email, password_hash) VALUES ($1, $2, $3) RETURNING *`,
+    const client = await adminPool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["admin:bootstrap"]);
+      const existingAdmins = await client.query("SELECT EXISTS (SELECT 1 FROM admins) AS has_admins");
+      if (existingAdmins.rows[0].has_admins && !req.admin) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "An admin token is required to register another admin" });
+      }
+
+      const result = await client.query(
+        `INSERT INTO admins (full_name, email, password_hash)
+         VALUES ($1, $2, $3)
+         RETURNING admin_id, full_name, email, status, created_at`,
       [full_name, email, hashedPassword]
-    );
-    return res.status(201).json({ message: "Admin registered successfully", admin: result.rows[0] });
+      );
+      await client.query("COMMIT");
+      return res.status(201).json({ message: "Admin registered successfully", admin: result.rows[0] });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
 
   } catch (err) {
     console.error("[registerAdmin]", err);

@@ -5,12 +5,12 @@ import {
     viewPalnns, createPalnns, updatePalnns, deletePalnns,
     createCompany, viewCompany, deleteCompany, hardDeleteCompany, changeStatus
 } from "../controllers/adminController.js";
-import { requireAdmin } from "../middleware/adminMiddleware.js";
+import { optionalAdmin, requireAdmin } from "../middleware/adminMiddleware.js";
 
 const router = Router();
 
 //auth
-router.post("/register", registerAdmin);  //Optional
+router.post("/register", optionalAdmin, registerAdmin);  // Bootstrap the first admin; later registrations require an admin token.
 router.post("/login", loginAdmin);
 router.post("/logout", requireAdmin, logoutAdmin);  //Optional
 

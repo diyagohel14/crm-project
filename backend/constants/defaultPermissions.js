@@ -252,4 +252,43 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "site_issue:update", moduleName: "Site Issues" },  //222
   { permissionName: "site_issue:delete", moduleName: "Site Issues" },  //223
   { permissionName: "site_issue:approve", moduleName: "Site Issues" },  //224
+
+  { permissionName: "lead:view", moduleName: "Lead" },  //225
+  { permissionName: "lead:create", moduleName: "Lead" },  //226
+  { permissionName: "lead:update", moduleName: "Lead" },  //227
+  { permissionName: "lead:delete", moduleName: "Lead" },  //228
+  { permissionName: "lead:convert", moduleName: "Lead" },  //229
+
+  { permissionName: "enquiry:view", moduleName: "Enquiry" },  //230
+  { permissionName: "enquiry:create", moduleName: "Enquiry" },  //231
+  { permissionName: "enquiry:update", moduleName: "Enquiry" },  //232
+  { permissionName: "enquiry:delete", moduleName: "Enquiry" },  //233
+
+  { permissionName: "enquiry_document:view", moduleName: "Enquiry" },  //234
+  { permissionName: "enquiry_document:create", moduleName: "Enquiry" },  //235
+  { permissionName: "enquiry_document:delete", moduleName: "Enquiry" },  //236
+
+  { permissionName: "lead_source:view", moduleName: "CRM Master" },  //237
+  { permissionName: "lead_source:create", moduleName: "CRM Master" },  //238
+
+  { permissionName: "industry:view", moduleName: "CRM Master" },  //239
+  { permissionName: "industry:create", moduleName: "CRM Master" },  //240
+
+  { permissionName: "equipment:view", moduleName: "Equipment" },  //241
+  { permissionName: "equipment:create", moduleName: "Equipment" },  //242
+  { permissionName: "equipment:update", moduleName: "Equipment" },  //243
+  { permissionName: "equipment:delete", moduleName: "Equipment" },  //244
+
+  { permissionName: "labour_trade:view", moduleName: "Manpower" },  //245
+  { permissionName: "labour_trade:create", moduleName: "Manpower" },  //246
+
+  { permissionName: "manpower_log:view", moduleName: "Manpower" },  //247
+  { permissionName: "manpower_log:create", moduleName: "Manpower" },  //248
+  { permissionName: "manpower_log:update", moduleName: "Manpower" },  //249
+  { permissionName: "manpower_log:delete", moduleName: "Manpower" },  //250
+
+  { permissionName: "equipment_log:view", moduleName: "Equipment" },  //251
+  { permissionName: "equipment_log:create", moduleName: "Equipment" },  //252
+  { permissionName: "equipment_log:update", moduleName: "Equipment" },  //253
+  { permissionName: "equipment_log:delete", moduleName: "Equipment" },  //254
 ];

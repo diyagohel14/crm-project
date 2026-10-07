@@ -4,7 +4,7 @@ import { Router } from "express";
 import {
     getProformas, createProforma, updateProforma, deleteProforma, deleteProformaItems, changeStatus
 } from "../controllers/proformaController.js";
-import { requireAuth, requirePermission, requireRole } from "../middleware/authMiddleware.js";
+import { requireAuth, requirePermission } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
