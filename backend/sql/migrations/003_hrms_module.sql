@@ -1,0 +1,103 @@
+﻿CREATE TABLE IF NOT EXISTS hrms_employees (
+    employee_id             SERIAL PRIMARY KEY,
+    company_id              INTEGER NOT NULL,
+    user_id                 INTEGER REFERENCES users(user_id),
+    employee_code           VARCHAR(50) NOT NULL UNIQUE,
+    first_name              VARCHAR(100) NOT NULL,
+    last_name               VARCHAR(100),
+    email                   VARCHAR(150) NOT NULL,
+    phone                   VARCHAR(20) NOT NULL,
+    gender                  VARCHAR(20),
+    date_of_birth           DATE,
+    joining_date            DATE,
+    employment_type         VARCHAR(30) DEFAULT 'full_time',
+    status                  VARCHAR(20) DEFAULT 'active',
+    department_id           INTEGER REFERENCES departments(department_id),
+    designation_id         INTEGER REFERENCES designations(designation_id),
+    branch_id               INTEGER REFERENCES branch_mst(branch_id),
+    shift_id                INTEGER REFERENCES shift_master(shift_id),
+    manager_user_id         INTEGER REFERENCES users(user_id),
+    work_location           VARCHAR(100),
+    address_line1           VARCHAR(255),
+    city_id                 INTEGER REFERENCES city_mst(city_id),
+    state_id                INTEGER REFERENCES state_mst(state_id),
+    country_id              INTEGER REFERENCES country_mst(country_id),
+    pincode                 VARCHAR(20),
+    emergency_contact_name  VARCHAR(100),
+    emergency_contact_phone VARCHAR(20),
+    bank_name               VARCHAR(100),
+    bank_account_no         VARCHAR(100),
+    ifsc_code               VARCHAR(50),
+    tax_id                  VARCHAR(50),
+    created_by              INTEGER REFERENCES users(user_id),
+    is_deleted              BOOLEAN DEFAULT FALSE,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_attendance (
+    attendance_id        SERIAL PRIMARY KEY,
+    employee_id          INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    attendance_date      DATE NOT NULL,
+    check_in             TIME,
+    check_out            TIME,
+    status               VARCHAR(20) DEFAULT 'present',
+    notes                TEXT,
+    approved_by          INTEGER REFERENCES users(user_id),
+    company_id           INTEGER NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, attendance_date, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_leave_requests (
+    leave_id             SERIAL PRIMARY KEY,
+    employee_id          INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    leave_type           VARCHAR(30) NOT NULL,
+    start_date           DATE NOT NULL,
+    end_date             DATE NOT NULL,
+    total_days           INTEGER NOT NULL DEFAULT 0,
+    reason               TEXT,
+    status               VARCHAR(20) DEFAULT 'pending',
+    requested_by         INTEGER REFERENCES users(user_id),
+    approved_by          INTEGER REFERENCES users(user_id),
+    approved_at          TIMESTAMP,
+    remarks              TEXT,
+    company_id           INTEGER NOT NULL,
+    is_deleted           BOOLEAN DEFAULT FALSE,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_payroll_runs (
+    payroll_id           SERIAL PRIMARY KEY,
+    pay_period_start     DATE NOT NULL,
+    pay_period_end       DATE NOT NULL,
+    total_gross          NUMERIC(18,2) DEFAULT 0,
+    total_deductions     NUMERIC(18,2) DEFAULT 0,
+    total_net            NUMERIC(18,2) DEFAULT 0,
+    status               VARCHAR(20) DEFAULT 'draft',
+    generated_by         INTEGER REFERENCES users(user_id),
+    approved_by          INTEGER REFERENCES users(user_id),
+    approved_at          TIMESTAMP,
+    company_id           INTEGER NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_payroll_items (
+    payroll_item_id      SERIAL PRIMARY KEY,
+    payroll_id           INTEGER NOT NULL REFERENCES hrms_payroll_runs(payroll_id),
+    employee_id          INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    basic_salary         NUMERIC(18,2) DEFAULT 0,
+    allowance_amount     NUMERIC(18,2) DEFAULT 0,
+    overtime_amount      NUMERIC(18,2) DEFAULT 0,
+    bonus_amount         NUMERIC(18,2) DEFAULT 0,
+    other_earnings       NUMERIC(18,2) DEFAULT 0,
+    deduction_amount     NUMERIC(18,2) DEFAULT 0,
+    gross_salary         NUMERIC(18,2) DEFAULT 0,
+    net_salary           NUMERIC(18,2) DEFAULT 0,
+    company_id           INTEGER NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (payroll_id, employee_id, company_id)
+);

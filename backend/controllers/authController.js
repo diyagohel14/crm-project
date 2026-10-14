@@ -10,6 +10,7 @@ import jwt from "jsonwebtoken";
 import { randomUUID } from "node:crypto";
 import { getAppConfig } from "../utils/env.js";
 import { revokeToken } from "../utils/tokenRevocation.js";
+import { buildSetClause } from "../services/crmService.js";
 
 const config = getAppConfig();
 
@@ -132,94 +133,106 @@ export async function updatemeController(req, res) {
       company_name, trade_name, logo, registration_number, gst_no, pan_no, phone, email, website, contact_name,
       address_line1, address_line2, city_id, state_id, country_id, pincode, authorized_signature,
     };
-    const updates = [];
-    const params = [];
-
     const bank_fields = {
       bank_id, account_holder_name, account_no, ifsc_code, swift_code, branch_name, upi_no, opening_balance,
     };
-    const bank_updates = [];
-    const bank_params = [];
-
-    Object.entries(fields).forEach(([key, value], index) => {
-      if (value !== undefined) {
-        updates.push(`${key} = $${index + 1}`);
-        params.push(value);
-      }
-    });
-
-    Object.entries(bank_fields).forEach(([key, value], index) => {
-      if (value !== undefined) {
-        bank_updates.push(`${key} = $${index + 1}`);
-        bank_params.push(value);
-      }
-    });
-    if (updates.length === 0 && bank_updates.length === 0) {
+    const profileFields = Object.entries(fields).filter(([, value]) => value !== undefined);
+    const bankFields = Object.entries(bank_fields).filter(([, value]) => value !== undefined);
+    const profileUpdate = buildSetClause(profileFields);
+    const bankUpdate = buildSetClause(bankFields);
+    if (profileFields.length === 0 && bankFields.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "No fields provided to update" });
     }
 
-    params.push(companyId);
-    bank_params.push(companyId);
+    let profile;
+    if (profileFields.length > 0) {
+      const profileParams = [...profileUpdate.values, companyId];
+      const query = `UPDATE tbl_company_profile SET ${profileUpdate.setSql} WHERE company_id = $${profileParams.length} AND is_deleted = FALSE RETURNING *`;
+      const result = await client.query(query, profileParams);
+      profile = result.rows[0];
+    } else {
+      const result = await client.query(
+        `SELECT * FROM tbl_company_profile WHERE company_id = $1 AND is_deleted = FALSE`,
+        [companyId]
+      );
+      profile = result.rows[0];
+    }
 
-    const query = `UPDATE tbl_company_profile SET ${updates.join(", ")} WHERE company_id = $${params.length} RETURNING *`;
-    const result = await client.query(query, params);
-
-
-    if (result.rows.length === 0) {
+    if (!profile) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Company not found" });
     }
 
-    const company_profile_id = result.rows[0].company_profile_id;
-    bank_params.push(company_profile_id);
+    const company_profile_id = profile.company_profile_id;
 
-    await logAudit(companyPool, {
-      module_name: "Company",
-      page_name: "Company Profile",
-      table_name: "tbl_company_profile",
-      table_id: company_profile_id,
-      action_type: "UPDATE",
-      action_description: "Company profile updated",
-      new_value: JSON.stringify(result.rows[0]),
-      user_id: userId,
-      role_id: roleId,
-      ip_address: ipAddress,
-      device_info: deviceInfo,
-      company_id: companyId
-    });
-
-    if (bank_updates.length > 0) {
-      const bank_query = `UPDATE tbl_company_bank_detail SET ${bank_updates.join(", ")} WHERE company_id = $${bank_params.length - 1} and company_profile_id = $${bank_params.length} RETURNING *`;
-      const bank_result = await client.query(bank_query, bank_params);
-      if (bank_result.rows.length === 0) {
-        return res.status(404).json({ error: "Bank details not found" });
-      }
-
-      await adminPool.query(
-        `UPDATE companies SET company_name = $1, company_email = $2, gst_no = $3, phone = $4, address = $5, updated_at = NOW() WHERE company_id = $6 RETURNING *`,
-        [company_name, email, gst_no, phone, address_line1, companyId]
-      );
-
+    if (profileFields.length > 0) {
       await logAudit(companyPool, {
         module_name: "Company",
-        page_name: "Company Bank Details",
-        table_name: "tbl_company_bank_detail",
-        table_id: bank_result.rows[0].comp_bank_id,
+        page_name: "Company Profile",
+        table_name: "tbl_company_profile",
+        table_id: company_profile_id,
         action_type: "UPDATE",
-        action_description: "Company bank details updated",
-        new_value: JSON.stringify(bank_result.rows[0]),
+        action_description: "Company profile updated",
+        new_value: JSON.stringify(profile),
         user_id: userId,
         role_id: roleId,
         ip_address: ipAddress,
         device_info: deviceInfo,
         company_id: companyId
       });
+    }
 
-      await client.query("COMMIT");
-      return res.json({ message: "Profile and bank details updated successfully", profile_details: result.rows[0], bank_details: bank_result.rows[0] });
+    let bankDetails = null;
+    if (bankFields.length > 0) {
+      const bankParams = [...bankUpdate.values, companyId, company_profile_id];
+      const bank_query = `UPDATE tbl_company_bank_detail SET ${bankUpdate.setSql} WHERE company_id = $${bankParams.length - 1} AND company_profile_id = $${bankParams.length} RETURNING *`;
+      const bank_result = await client.query(bank_query, bankParams);
+      if (bank_result.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Bank details not found" });
+      }
+      bankDetails = bank_result.rows[0];
+
+      await logAudit(companyPool, {
+        module_name: "Company",
+        page_name: "Company Bank Details",
+        table_name: "tbl_company_bank_detail",
+        table_id: bankDetails.comp_bank_id,
+        action_type: "UPDATE",
+        action_description: "Company bank details updated",
+        new_value: JSON.stringify(bankDetails),
+        user_id: userId,
+        role_id: roleId,
+        ip_address: ipAddress,
+        device_info: deviceInfo,
+        company_id: companyId
+      });
+    }
+
+    const adminCompanyFields = [
+      ["company_name", profile.company_name, profileFields.some(([key]) => key === "company_name")],
+      ["company_email", profile.email, profileFields.some(([key]) => key === "email")],
+      ["gst_no", profile.gst_no, profileFields.some(([key]) => key === "gst_no")],
+      ["phone", profile.phone, profileFields.some(([key]) => key === "phone")],
+      ["address", profile.address_line1, profileFields.some(([key]) => key === "address_line1")],
+    ].filter(([, , isUpdated]) => isUpdated);
+    if (adminCompanyFields.length > 0) {
+      const adminCompanyUpdate = buildSetClause(adminCompanyFields.map(([key, value]) => [key, value]));
+      const adminParams = [...adminCompanyUpdate.values, companyId];
+      await adminPool.query(
+        `UPDATE companies SET ${adminCompanyUpdate.setSql}, updated_at = NOW() WHERE company_id = $${adminParams.length}`,
+        adminParams
+      );
     }
 
     await client.query("COMMIT");
-    return res.json({ message: "Profile updated successfully", profile_details: result.rows[0], bank_details: null });
+    const message = profileFields.length > 0 && bankDetails
+      ? "Profile and bank details updated successfully"
+      : bankDetails
+        ? "Bank details updated successfully"
+        : "Profile updated successfully";
+    return res.json({ message, profile_details: profile, bank_details: bankDetails });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error(err);

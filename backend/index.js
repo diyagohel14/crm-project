@@ -23,6 +23,7 @@ import enquiryRoutes from "./routes/enquiryRoutes.js";
 import crmRoutes from "./routes/crmRoutes.js";
 import manpowerRoutes from "./routes/manpowerRoutes.js";
 import equipmentRoutes from "./routes/equipmentRoutes.js";
+import hrmsRoutes from "./routes/hrmsRoutes.js";
 import { getAppConfig } from "./utils/env.js";
 
 const config = getAppConfig();
@@ -65,6 +66,7 @@ app.use("/api/debit_note", debitNoteRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/manpower", manpowerRoutes); // labour trades + project manpower cost logs
 app.use("/api/equipment", equipmentRoutes); // equipment register + project equipment cost logs
+app.use("/api/hrms", hrmsRoutes); // workforce management, attendance, leave and payroll
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 

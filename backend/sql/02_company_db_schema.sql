@@ -483,7 +483,6 @@ CREATE TABLE IF NOT EXISTS departments (
 -- =====================================================================
 -- SECTION 6: USERS, SECURITY & AUDIT
 -- =====================================================================
-
 CREATE TABLE IF NOT EXISTS users (
     user_id             SERIAL PRIMARY KEY,
     employee_id         VARCHAR(20),                       -- optional, ERP-specific
@@ -1524,6 +1523,230 @@ CREATE TABLE IF NOT EXISTS tbl_proforma_tax_details (
     tax_amount                               DECIMAL(20,2),
     is_deleted                                  BOOLEAN DEFAULT FALSE
 );
+
+-- =====================================================================
+-- HRMS: declared after users and organization masters because its foreign
+-- keys depend on those tables.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS hrms_employees (
+    employee_id             SERIAL PRIMARY KEY,
+    company_id              INTEGER NOT NULL,
+    user_id                 INTEGER REFERENCES users(user_id),
+    employee_code           VARCHAR(50) NOT NULL UNIQUE,
+    first_name              VARCHAR(100) NOT NULL,
+    last_name               VARCHAR(100),
+    email                   VARCHAR(150) NOT NULL,
+    phone                   VARCHAR(20) NOT NULL,
+    gender                  VARCHAR(20),
+    date_of_birth           DATE,
+    joining_date            DATE,
+    employment_type         VARCHAR(30) DEFAULT 'full_time',
+    status                  VARCHAR(20) DEFAULT 'active',
+    department_id           INTEGER REFERENCES departments(department_id),
+    designation_id          INTEGER REFERENCES designations(designation_id),
+    branch_id               INTEGER REFERENCES branch_mst(branch_id),
+    shift_id                INTEGER REFERENCES shift_master(shift_id),
+    manager_user_id         INTEGER REFERENCES users(user_id),
+    work_location           VARCHAR(100),
+    address_line1           VARCHAR(255),
+    city_id                 INTEGER REFERENCES city_mst(city_id),
+    state_id                INTEGER REFERENCES state_mst(state_id),
+    country_id              INTEGER REFERENCES country_mst(country_id),
+    pincode                 VARCHAR(20),
+    emergency_contact_name  VARCHAR(100),
+    emergency_contact_phone VARCHAR(20),
+    bank_name               VARCHAR(100),
+    bank_account_no         VARCHAR(100),
+    ifsc_code               VARCHAR(50),
+    tax_id                  VARCHAR(50),
+    created_by              INTEGER REFERENCES users(user_id),
+    is_deleted              BOOLEAN DEFAULT FALSE,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_attendance (
+    attendance_id       SERIAL PRIMARY KEY,
+    employee_id         INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    attendance_date     DATE NOT NULL,
+    check_in            TIME,
+    check_out           TIME,
+    status              VARCHAR(20) DEFAULT 'present',
+    notes               TEXT,
+    approved_by         INTEGER REFERENCES users(user_id),
+    company_id          INTEGER NOT NULL,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, attendance_date, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_leave_requests (
+    leave_id            SERIAL PRIMARY KEY,
+    employee_id         INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    leave_type          VARCHAR(30) NOT NULL,
+    start_date          DATE NOT NULL,
+    end_date            DATE NOT NULL,
+    total_days          INTEGER NOT NULL DEFAULT 0,
+    reason              TEXT,
+    status              VARCHAR(20) DEFAULT 'pending',
+    requested_by        INTEGER REFERENCES users(user_id),
+    approved_by         INTEGER REFERENCES users(user_id),
+    approved_at         TIMESTAMP,
+    remarks             TEXT,
+    company_id          INTEGER NOT NULL,
+    is_deleted          BOOLEAN DEFAULT FALSE,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_payroll_runs (
+    payroll_id          SERIAL PRIMARY KEY,
+    pay_period_start    DATE NOT NULL,
+    pay_period_end      DATE NOT NULL,
+    total_gross         NUMERIC(18,2) DEFAULT 0,
+    total_deductions    NUMERIC(18,2) DEFAULT 0,
+    total_net           NUMERIC(18,2) DEFAULT 0,
+    status              VARCHAR(20) DEFAULT 'draft',
+    generated_by        INTEGER REFERENCES users(user_id),
+    approved_by         INTEGER REFERENCES users(user_id),
+    approved_at         TIMESTAMP,
+    company_id          INTEGER NOT NULL,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_payroll_items (
+    payroll_item_id             SERIAL PRIMARY KEY,
+    payroll_id                  INTEGER NOT NULL REFERENCES hrms_payroll_runs(payroll_id),
+    employee_id                 INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    basic_salary                NUMERIC(18,2) DEFAULT 0,
+    allowance_amount            NUMERIC(18,2) DEFAULT 0,
+    overtime_amount             NUMERIC(18,2) DEFAULT 0,
+    bonus_amount                NUMERIC(18,2) DEFAULT 0,
+    other_earnings              NUMERIC(18,2) DEFAULT 0,
+    deduction_amount            NUMERIC(18,2) DEFAULT 0,
+    statutory_deduction_amount  NUMERIC(18,2) NOT NULL DEFAULT 0,
+    gross_salary                NUMERIC(18,2) DEFAULT 0,
+    net_salary                  NUMERIC(18,2) DEFAULT 0,
+    company_id                  INTEGER NOT NULL,
+    created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (payroll_id, employee_id, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_shift_rosters (
+    shift_roster_id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    shift_id INTEGER NOT NULL REFERENCES shift_master(shift_id),
+    roster_date DATE NOT NULL,
+    assigned_by INTEGER REFERENCES users(user_id),
+    company_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, roster_date, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_overtime_requests (
+    overtime_request_id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    work_date DATE NOT NULL,
+    hours NUMERIC(6,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+    hourly_rate NUMERIC(18,2) CHECK (hourly_rate IS NULL OR hourly_rate >= 0),
+    reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+    requested_by INTEGER REFERENCES users(user_id),
+    approved_by INTEGER REFERENCES users(user_id),
+    approved_at TIMESTAMP,
+    remarks TEXT,
+    company_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_leave_balances (
+    leave_balance_id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    leave_type VARCHAR(30) NOT NULL,
+    leave_year INTEGER NOT NULL CHECK (leave_year BETWEEN 1900 AND 2200),
+    opening_days NUMERIC(8,2) NOT NULL DEFAULT 0 CHECK (opening_days >= 0),
+    accrued_days NUMERIC(8,2) NOT NULL DEFAULT 0 CHECK (accrued_days >= 0),
+    used_days NUMERIC(8,2) NOT NULL DEFAULT 0 CHECK (used_days >= 0),
+    adjusted_days NUMERIC(8,2) NOT NULL DEFAULT 0,
+    updated_by INTEGER REFERENCES users(user_id),
+    company_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (employee_id, leave_type, leave_year, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_employee_documents (
+    document_id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    document_type VARCHAR(80) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    storage_key VARCHAR(1024) NOT NULL,
+    issued_on DATE,
+    expires_on DATE,
+    uploaded_by INTEGER REFERENCES users(user_id),
+    company_id INTEGER NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_onboarding_tasks (
+    task_id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES hrms_employees(employee_id),
+    title VARCHAR(150) NOT NULL,
+    description TEXT,
+    due_date DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped')),
+    assigned_to INTEGER REFERENCES users(user_id),
+    created_by INTEGER REFERENCES users(user_id),
+    completed_at TIMESTAMP,
+    company_id INTEGER NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hrms_deduction_rules (
+    rule_id SERIAL PRIMARY KEY,
+    rule_code VARCHAR(40) NOT NULL,
+    rule_name VARCHAR(100) NOT NULL,
+    calculation_method VARCHAR(20) NOT NULL CHECK (calculation_method IN ('fixed', 'percentage')),
+    calculation_basis VARCHAR(20) NOT NULL CHECK (calculation_basis IN ('basic_salary', 'gross_salary')),
+    rate NUMERIC(18,4) NOT NULL CHECK (rate >= 0),
+    is_statutory BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    company_id INTEGER NOT NULL,
+    created_by INTEGER REFERENCES users(user_id),
+    updated_by INTEGER REFERENCES users(user_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (rule_code, company_id),
+    CHECK (calculation_method <> 'percentage' OR rate <= 100)
+);
+
+CREATE TABLE IF NOT EXISTS hrms_payroll_item_deductions (
+    payroll_item_deduction_id SERIAL PRIMARY KEY,
+    payroll_item_id INTEGER NOT NULL REFERENCES hrms_payroll_items(payroll_item_id),
+    rule_code VARCHAR(40) NOT NULL,
+    rule_name VARCHAR(100) NOT NULL,
+    is_statutory BOOLEAN NOT NULL DEFAULT FALSE,
+    amount NUMERIC(18,2) NOT NULL CHECK (amount >= 0),
+    company_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (payroll_item_id, rule_code, company_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hrms_rosters_company_date ON hrms_shift_rosters(company_id, roster_date);
+CREATE INDEX IF NOT EXISTS idx_hrms_overtime_company_status_date ON hrms_overtime_requests(company_id, status, work_date);
+CREATE INDEX IF NOT EXISTS idx_hrms_leave_balances_employee_year ON hrms_leave_balances(company_id, employee_id, leave_year);
+CREATE INDEX IF NOT EXISTS idx_hrms_documents_employee ON hrms_employee_documents(company_id, employee_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_hrms_onboarding_employee_status ON hrms_onboarding_tasks(company_id, employee_id, status) WHERE is_deleted = FALSE;
 
 
 -- =====================================================================

@@ -291,4 +291,37 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "equipment_log:create", moduleName: "Equipment" },  //252
   { permissionName: "equipment_log:update", moduleName: "Equipment" },  //253
   { permissionName: "equipment_log:delete", moduleName: "Equipment" },  //254
+  
+  { permissionName: "hrms_employee:view", moduleName: "HRMS" },
+  { permissionName: "hrms_employee:create", moduleName: "HRMS" },
+  { permissionName: "hrms_employee:update", moduleName: "HRMS" },
+  { permissionName: "hrms_employee:delete", moduleName: "HRMS" },
+
+  { permissionName: "hrms_attendance:view", moduleName: "HRMS" },
+  { permissionName: "hrms_attendance:create", moduleName: "HRMS" },
+
+  { permissionName: "hrms_leave:view", moduleName: "HRMS" },
+  { permissionName: "hrms_leave:create", moduleName: "HRMS" },
+  { permissionName: "hrms_leave:update", moduleName: "HRMS" },
+
+  { permissionName: "hrms_payroll:view", moduleName: "HRMS" },
+  { permissionName: "hrms_payroll:create", moduleName: "HRMS" },
+  { permissionName: "hrms_payroll:update", moduleName: "HRMS" },
+  { permissionName: "hrms_payroll:approve", moduleName: "HRMS" },
+  { permissionName: "hrms_roster:view", moduleName: "HRMS" },
+  { permissionName: "hrms_roster:create", moduleName: "HRMS" },
+  { permissionName: "hrms_overtime:view", moduleName: "HRMS" },
+  { permissionName: "hrms_overtime:create", moduleName: "HRMS" },
+  { permissionName: "hrms_overtime:approve", moduleName: "HRMS" },
+  { permissionName: "hrms_leave_balance:view", moduleName: "HRMS" },
+  { permissionName: "hrms_leave_balance:update", moduleName: "HRMS" },
+  { permissionName: "hrms_document:view", moduleName: "HRMS" },
+  { permissionName: "hrms_document:create", moduleName: "HRMS" },
+  { permissionName: "hrms_document:delete", moduleName: "HRMS" },
+  { permissionName: "hrms_onboarding:view", moduleName: "HRMS" },
+  { permissionName: "hrms_onboarding:create", moduleName: "HRMS" },
+  { permissionName: "hrms_onboarding:update", moduleName: "HRMS" },
+  { permissionName: "hrms_analytics:view", moduleName: "HRMS" },
+
+
 ];

@@ -20,10 +20,6 @@ const poolCache = new Map();
  * by looking up its connection info in the Admin DB.
  */
 export async function getCompanyPool(companyId) {
-  if (poolCache.has(companyId)) {
-    return poolCache.get(companyId);
-  }
-
   const { rows } = await adminPool.query(
     `SELECT company_id, db_name, db_host, db_port, db_username, db_password, status, is_deleted
        FROM companies
@@ -41,6 +37,10 @@ export async function getCompanyPool(companyId) {
   }
   if (company.status !== "active") {
     throw new Error(`Company ${companyId} is not active (status=${company.status})`);
+  }
+
+  if (poolCache.has(companyId)) {
+    return poolCache.get(companyId);
   }
 
   const pool = new Pool({
