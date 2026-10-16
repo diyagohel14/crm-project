@@ -1652,6 +1652,7 @@ CREATE TABLE IF NOT EXISTS hrms_overtime_requests (
     work_date DATE NOT NULL,
     hours NUMERIC(6,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
     hourly_rate NUMERIC(18,2) CHECK (hourly_rate IS NULL OR hourly_rate >= 0),
+    payroll_id INTEGER REFERENCES hrms_payroll_runs(payroll_id),
     reason TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),

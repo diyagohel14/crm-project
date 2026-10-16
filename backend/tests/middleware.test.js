@@ -32,32 +32,42 @@ function requestMock(token) {
   };
 }
 
-test("requireAuth rejects missing and invalid bearer tokens", () => {
+test("requireAuth rejects missing and invalid bearer tokens", async () => {
   const missingResponse = responseMock();
-  requireAuth(requestMock(), missingResponse, () => assert.fail("next should not run"));
+  await requireAuth(requestMock(), missingResponse, () => assert.fail("next should not run"));
   assert.equal(missingResponse.statusCode, 401);
 
   const invalidResponse = responseMock();
-  requireAuth(requestMock("invalid"), invalidResponse, () => assert.fail("next should not run"));
+  await requireAuth(requestMock("invalid"), invalidResponse, () => assert.fail("next should not run"));
   assert.deepEqual(invalidResponse.body, { error: "Invalid token" });
 });
 
-test("requireAuth attaches verified user and protects session user", () => {
+test("requireAuth attaches verified active user and protects session user", async () => {
   const token = jwt.sign({ userId: 7, companyId: 3, jti: `auth-${Date.now()}` }, jwtSecret);
   const req = requestMock(token);
   let called = false;
-  requireAuth(req, responseMock(), () => { called = true; });
+  req.companyPool = { query: async () => ({ rows: [{ "?column?": 1 }] }) };
+  await requireAuth(req, responseMock(), () => { called = true; });
   assert.equal(called, true);
   assert.equal(req.user.userId, 7);
   assert.equal(req.session.user.userId, 7);
 });
 
-test("requireAuth rejects revoked tokens", () => {
+test("requireAuth rejects inactive tenant users", async () => {
+  const token = jwt.sign({ userId: 7, companyId: 3, jti: `inactive-${Date.now()}` }, jwtSecret);
+  const req = requestMock(token);
+  req.companyPool = { query: async () => ({ rows: [] }) };
+  const response = responseMock();
+  await requireAuth(req, response, () => assert.fail("next should not run"));
+  assert.deepEqual(response.body, { error: "User account is inactive" });
+});
+
+test("requireAuth rejects revoked tokens", async () => {
   const tokenId = `revoked-${Date.now()}`;
   const token = jwt.sign({ jti: tokenId }, jwtSecret);
   revokeToken(tokenId, Math.floor(Date.now() / 1000) + 60);
   const response = responseMock();
-  requireAuth(requestMock(token), response, () => assert.fail("next should not run"));
+  await requireAuth(requestMock(token), response, () => assert.fail("next should not run"));
   assert.deepEqual(response.body, { error: "Token has been logged out" });
 });
 

@@ -51,9 +51,18 @@ const { Pool, Client } = pg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCHEMA_SQL_PATH = path.join(__dirname, "..", "sql", "02_company_db_schema.sql");
+const HRMS_WORKFLOWS_MIGRATION_PATH = path.join(__dirname, "..", "sql", "migrations", "005_hrms_workflows.sql");
+const HRMS_PROJECT_PERMISSION_MIGRATION_PATH = path.join(__dirname, "..", "sql", "migrations", "006_hrms_project_assignment_update_permission.sql");
 
 function loadCompanySchemaSql() {
   return fs.readFileSync(SCHEMA_SQL_PATH, "utf8");
+}
+
+function loadHrmsWorkflowsMigrationSql() {
+  return [
+    fs.readFileSync(HRMS_WORKFLOWS_MIGRATION_PATH, "utf8"),
+    fs.readFileSync(HRMS_PROJECT_PERMISSION_MIGRATION_PATH, "utf8"),
+  ].join("\n");
 }
 
 /**
@@ -241,6 +250,8 @@ export async function registerCompanyWithSuperAdmin(input) {
         `INSERT INTO tbl_company_bank_detail (company_profile_id, company_id) VALUES ($1,$2)`,
         [company_profile_id, companyId]
       )
+      await schemaPool.query(loadHrmsWorkflowsMigrationSql());
+
       // ---- 4c. Register the login-routing row in the Admin DB ----
       // NOTE: no password stored here - the real password check happens
       // against the company DB's users table. This row only answers

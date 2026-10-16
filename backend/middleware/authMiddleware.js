@@ -7,8 +7,8 @@ import { isTokenRevoked } from "../utils/tokenRevocation.js";
 
 const config = getAppConfig();
 
-/** Blocks the request unless a valid company JWT is supplied. */
-export function requireAuth(req, res, next) {
+/** Blocks the request unless a valid company JWT belongs to an active tenant user. */
+export async function requireAuth(req, res, next) {
   const authorization = req.get("authorization");
   const [scheme, token] = authorization?.split(" ") ?? [];
 
@@ -21,26 +21,43 @@ export function requireAuth(req, res, next) {
     if (isTokenRevoked(req.user.jti)) {
       return res.status(401).json({ error: "Token has been logged out" });
     }
-
-    req.authToken = token;
-    // Keep legacy controllers compatible without storing the current user
-    // on the shared express-session object.
-    if (req.session) {
-      const session = req.session;
-      req.session = new Proxy(session, {
-        get(target, property, receiver) {
-          if (property === "user") return req.user;
-          return Reflect.get(target, property, receiver);
-        },
-        set(target, property, value, receiver) {
-          if (property === "user") return true;
-          return Reflect.set(target, property, value, receiver);
-        },
-      });
-    }
   } catch (err) {
     return res.status(401).json({
       error: err.name === "TokenExpiredError" ? "Token expired" : "Invalid token",
+    });
+  }
+
+  if (!Number.isInteger(req.user.userId) || req.user.userId <= 0
+      || !Number.isInteger(req.user.companyId) || req.user.companyId <= 0) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+
+  try {
+    const companyPool = req.companyPool ?? await getCompanyPool(req.user.companyId);
+    const userResult = await companyPool.query(
+      "SELECT 1 FROM users WHERE user_id = $1 AND company_id = $2 AND status = 'active' AND is_deleted = FALSE",
+      [req.user.userId, req.user.companyId]
+    );
+    if (!userResult.rows.length) return res.status(401).json({ error: "User account is inactive" });
+  } catch (err) {
+    console.error("[requireAuth] failed to verify tenant user status", err);
+    return res.status(503).json({ error: "Unable to verify user account status" });
+  }
+
+  req.authToken = token;
+  // Keep legacy controllers compatible without storing the current user
+  // on the shared express-session object.
+  if (req.session) {
+    const session = req.session;
+    req.session = new Proxy(session, {
+      get(target, property, receiver) {
+        if (property === "user") return req.user;
+        return Reflect.get(target, property, receiver);
+      },
+      set(target, property, value, receiver) {
+        if (property === "user") return true;
+        return Reflect.set(target, property, value, receiver);
+      },
     });
   }
 

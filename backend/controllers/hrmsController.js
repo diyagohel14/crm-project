@@ -1,5 +1,6 @@
 ﻿import { getCompanyPool } from "../config/companyPoolManager.js";
 import { logAudit } from "../services/authService.js";
+import { hasPermission } from "../services/permissionService.js";
 import { getRequestInfo } from "../utils/crypto.js";
 import {
   calculateConfiguredDeduction,
@@ -7,6 +8,9 @@ import {
   calculateLeaveDaysByYear,
   calculateOvertimePay,
   calculatePayrollBreakdown,
+  canTransitionLeaveStatus,
+  isValidDateOnly,
+  isValidTime,
 } from "../services/hrmsService.js";
 
 const employeeStatusSet = new Set(["active", "inactive", "on_leave", "terminated", "pending"]);
@@ -27,6 +31,24 @@ function normalizeStatus(value, fallback, allowedSet) {
 
 function buildEmployeeCode() {
   return `EMP-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+}
+
+function employeeResponse(employee, user) {
+  if (hasPermission(user.permissions || [], "hrms_employee:private:view")) return employee;
+  const {
+    bank_name,
+    bank_account_no,
+    ifsc_code,
+    tax_id,
+    ...publicEmployee
+  } = employee;
+  return publicEmployee;
+}
+
+function hasPrivateEmployeeFields(payload) {
+  return ["bankName", "bank_name", "bankAccountNo", "bank_account_no", "ifscCode", "ifsc_code", "taxId", "tax_id"].some((field) =>
+    Object.prototype.hasOwnProperty.call(payload, field)
+  );
 }
 
 export async function listEmployees(req, res) {
@@ -72,7 +94,7 @@ export async function listEmployees(req, res) {
     ORDER BY e.created_at DESC
   `, params);
 
-  return res.json({ employees: result.rows });
+  return res.json({ employees: result.rows.map((employee) => employeeResponse(employee, req.user)) });
 }
 
 export async function createEmployee(req, res) {
@@ -89,6 +111,9 @@ export async function createEmployee(req, res) {
 
   if (!firstName || !email || !phone) {
     return res.status(400).json({ error: "firstName, email and phone are required" });
+  }
+  if (hasPrivateEmployeeFields(payload) && !hasPermission(req.user.permissions || [], "hrms_employee:private:update")) {
+    return res.status(403).json({ error: "Missing required permission: hrms_employee:private:update" });
   }
 
   try {
@@ -151,7 +176,7 @@ export async function createEmployee(req, res) {
       company_id: companyId,
     });
 
-    return res.status(201).json({ message: "Employee created", employee: result.rows[0] });
+    return res.status(201).json({ message: "Employee created", employee: employeeResponse(result.rows[0], req.user) });
   } catch (error) {
     console.error("[createEmployee]", error);
     return res.status(500).json({ error: "Failed to create employee", detail: error.message });
@@ -175,7 +200,7 @@ export async function getEmployee(req, res) {
     return res.status(404).json({ error: "Employee not found" });
   }
 
-  return res.json({ employee: result.rows[0] });
+  return res.json({ employee: employeeResponse(result.rows[0], req.user) });
 }
 
 export async function updateEmployee(req, res) {
@@ -225,6 +250,10 @@ export async function updateEmployee(req, res) {
     index += 1;
   }
 
+  if (hasPrivateEmployeeFields(payload) && !hasPermission(req.user.permissions || [], "hrms_employee:private:update")) {
+    return res.status(403).json({ error: "Missing required permission: hrms_employee:private:update" });
+  }
+
   if (updates.length === 0) {
     return res.status(400).json({ error: "No employee fields provided to update" });
   }
@@ -258,7 +287,7 @@ export async function updateEmployee(req, res) {
     company_id: companyId,
   });
 
-  return res.json({ message: "Employee updated", employee: result.rows[0] });
+  return res.json({ message: "Employee updated", employee: employeeResponse(result.rows[0], req.user) });
 }
 
 export async function deleteEmployee(req, res) {
@@ -293,7 +322,7 @@ export async function deleteEmployee(req, res) {
     company_id: companyId,
   });
 
-  return res.json({ message: "Employee deleted", employee: result.rows[0] });
+  return res.json({ message: "Employee deleted", employee: employeeResponse(result.rows[0], req.user) });
 }
 
 export async function listAttendance(req, res) {
@@ -304,25 +333,36 @@ export async function listAttendance(req, res) {
   const clauses = ["a.company_id = $1"];
   let index = 2;
 
-  if (employeeId) {
+  if (employeeId !== undefined) {
+    const validatedEmployeeId = Number(employeeId);
+    if (!Number.isInteger(validatedEmployeeId) || validatedEmployeeId <= 0) {
+      return res.status(400).json({ error: "employeeId must be a positive integer" });
+    }
     clauses.push(`a.employee_id = $${index}`);
-    params.push(employeeId);
+    params.push(validatedEmployeeId);
     index += 1;
   }
 
-  if (fromDate) {
+  if (fromDate !== undefined) {
+    if (!isValidDateOnly(fromDate)) return res.status(400).json({ error: "fromDate must be a valid YYYY-MM-DD date" });
     clauses.push(`a.attendance_date >= $${index}`);
     params.push(fromDate);
     index += 1;
   }
 
-  if (toDate) {
+  if (toDate !== undefined) {
+    if (!isValidDateOnly(toDate)) return res.status(400).json({ error: "toDate must be a valid YYYY-MM-DD date" });
     clauses.push(`a.attendance_date <= $${index}`);
     params.push(toDate);
     index += 1;
   }
 
-  if (status) {
+  if (fromDate && toDate && fromDate > toDate) {
+    return res.status(400).json({ error: "fromDate must not be after toDate" });
+  }
+
+  if (status !== undefined) {
+    if (!attendanceStatusSet.has(status)) return res.status(400).json({ error: "status is invalid" });
     clauses.push(`a.status = $${index}`);
     params.push(status);
     index += 1;
@@ -346,38 +386,49 @@ export async function createAttendance(req, res) {
   const payload = req.body || {};
   const employeeId = Number(payload.employeeId ?? payload.employee_id);
   const attendanceDate = sanitizeString(payload.attendanceDate ?? payload.attendance_date) || new Date().toISOString().slice(0, 10);
-  const status = normalizeStatus(payload.status ?? "present", "present", attendanceStatusSet);
+  const rawStatus = sanitizeString(payload.status ?? "present");
+  const status = normalizeStatus(rawStatus, "present", attendanceStatusSet);
+  const checkIn = sanitizeString(payload.checkIn ?? payload.check_in);
+  const checkOut = sanitizeString(payload.checkOut ?? payload.check_out);
 
-  if (!employeeId) {
-    return res.status(400).json({ error: "employeeId is required" });
+  if (!Number.isInteger(employeeId) || employeeId <= 0 || !isValidDateOnly(attendanceDate)) {
+    return res.status(400).json({ error: "A positive employeeId and valid attendanceDate are required" });
   }
-
-  const existing = await companyPool.query(
-    "SELECT * FROM hrms_attendance WHERE employee_id = $1 AND attendance_date = $2 AND company_id = $3",
-    [employeeId, attendanceDate, companyId]
+  if (!attendanceStatusSet.has(rawStatus)) {
+    return res.status(400).json({ error: "Invalid attendance status" });
+  }
+  if ((checkIn && !isValidTime(checkIn)) || (checkOut && !isValidTime(checkOut))) {
+    return res.status(400).json({ error: "checkIn and checkOut must use HH:MM or HH:MM:SS format" });
+  }
+  const attendanceExists = await companyPool.query(
+    `SELECT 1 FROM hrms_employees e
+     WHERE e.employee_id = $1 AND e.company_id = $2 AND e.is_deleted = FALSE AND e.status = 'active'`,
+    [employeeId, companyId]
   );
-  const record = existing.rows[0];
-
-  const result = record
-    ? await companyPool.query(`
-        UPDATE hrms_attendance
-        SET check_in = $1, check_out = $2, status = $3, notes = $4, approved_by = $5, updated_at = NOW()
-        WHERE attendance_id = $6 AND company_id = $7
+  if (!attendanceExists.rows.length) {
+    return res.status(404).json({ error: "Active employee not found" });
+  }
+  let result;
+  try {
+    result = await companyPool.query(`
+        INSERT INTO hrms_attendance (employee_id, attendance_date, check_in, check_out, status, notes, company_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
         RETURNING *
-      `, [sanitizeString(payload.checkIn ?? payload.check_in), sanitizeString(payload.checkOut ?? payload.check_out), status, sanitizeString(payload.notes), userId, record.attendance_id, companyId])
-    : await companyPool.query(`
-        INSERT INTO hrms_attendance (employee_id, attendance_date, check_in, check_out, status, notes, approved_by, company_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        RETURNING *
-      `, [employeeId, attendanceDate, sanitizeString(payload.checkIn ?? payload.check_in), sanitizeString(payload.checkOut ?? payload.check_out), status, sanitizeString(payload.notes), userId, companyId]);
+          `, [employeeId, attendanceDate, checkIn || null, checkOut || null, status, sanitizeString(payload.notes) || null, companyId]);
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({ error: "Attendance already exists for this employee and date; submit a correction request" });
+    }
+    throw error;
+  }
 
   await logAudit(companyPool, {
     module_name: "HRMS",
     page_name: "Attendance",
     table_name: "hrms_attendance",
     table_id: String(result.rows[0].attendance_id),
-    action_type: "UPDATE",
-    action_description: "Attendance record saved",
+    action_type: "CREATE",
+    action_description: "Attendance record created",
     new_value: JSON.stringify(result.rows[0]),
     user_id: userId,
     role_id: roleId,
@@ -386,7 +437,7 @@ export async function createAttendance(req, res) {
     company_id: companyId,
   });
 
-  return res.status(record ? 200 : 201).json({ message: "Attendance saved", attendance: result.rows[0] });
+  return res.status(201).json({ message: "Attendance saved", attendance: result.rows[0] });
 }
 
 export async function listLeaveRequests(req, res) {
@@ -438,6 +489,15 @@ export async function createLeaveRequest(req, res) {
   if (totalDays === 0) {
     return res.status(400).json({ error: "startDate and endDate must be valid dates in ascending order" });
   }
+  if (!isValidDateOnly(startDate) || !isValidDateOnly(endDate)) {
+    return res.status(400).json({ error: "startDate and endDate must be valid YYYY-MM-DD dates" });
+  }
+  const employee = await companyPool.query(
+    `SELECT employee_id FROM hrms_employees
+     WHERE employee_id = $1 AND company_id = $2 AND is_deleted = FALSE AND status = 'active'`,
+    [employeeId, companyId]
+  );
+  if (!employee.rows.length) return res.status(404).json({ error: "Active employee not found" });
   const result = await companyPool.query(`
     INSERT INTO hrms_leave_requests (
       employee_id, leave_type, start_date, end_date, total_days, reason,
@@ -489,6 +549,26 @@ export async function updateLeaveRequest(req, res) {
       return res.status(404).json({ error: "Leave request not found" });
     }
     const current = currentResult.rows[0];
+    if (!canTransitionLeaveStatus(current.status, status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: `Leave request cannot transition from ${current.status} to ${status}` });
+    }
+    if (["approved", "rejected"].includes(status)) {
+      if (!hasPermission(req.user.permissions || [], "hrms_leave:approve")) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "Missing required permission: hrms_leave:approve" });
+      }
+      if (Number(current.requested_by) === Number(userId)) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "A user cannot approve or reject their own leave request" });
+      }
+    }
+    if (status === "cancelled" && current.status === "pending"
+      && Number(current.requested_by) !== Number(userId)
+      && !hasPermission(req.user.permissions || [], "hrms_leave:approve")) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "Only the requester or a leave approver can cancel a pending request" });
+    }
     const result = await client.query(`
       UPDATE hrms_leave_requests
       SET status = $1, approved_by = $2, approved_at = CASE WHEN $1 IN ('approved', 'rejected') THEN NOW() ELSE NULL END,
@@ -553,7 +633,11 @@ export async function listPayrollRuns(req, res) {
   const { companyId } = req.user;
   const companyPool = await getCompanyPool(companyId);
   const result = await companyPool.query(`
-    SELECT p.*, COUNT(pi.payroll_item_id) AS employee_count, SUM(pi.net_salary) AS net_payroll_total
+    SELECT p.*, COUNT(pi.payroll_item_id) AS employee_count, SUM(pi.net_salary) AS net_payroll_total,
+           (SELECT COALESCE(SUM(pm.amount), 0)
+            FROM hrms_payroll_payments pm
+            WHERE pm.payroll_id = p.payroll_id AND pm.company_id = p.company_id
+              AND pm.status = 'recorded') AS total_paid
     FROM hrms_payroll_runs p
     LEFT JOIN hrms_payroll_items pi ON pi.payroll_id = p.payroll_id AND pi.company_id = p.company_id
     WHERE p.company_id = $1
@@ -594,11 +678,13 @@ export async function createPayrollRun(req, res) {
   const amountFields = [
     ["basicSalary", "basic_salary"],
     ["allowances", "allowanceAmount", "allowance_amount"],
-    ["overtime", "overtimeAmount", "overtime_amount"],
     ["bonus", "bonusAmount", "bonus_amount"],
     ["otherEarnings", "other_earnings"],
     ["deductions", "deductionAmount", "deduction_amount"],
   ];
+  if (items.some((item) => Number(item.overtime ?? item.overtimeAmount ?? item.overtime_amount ?? 0) !== 0)) {
+    return res.status(400).json({ error: "Overtime must come from approved overtime requests, not payroll item input" });
+  }
   if (items.some((item) => amountFields.some((aliases) => {
     const value = aliases.map((key) => item[key]).find((field) => field !== undefined && field !== null);
     return value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0);
@@ -609,9 +695,27 @@ export async function createPayrollRun(req, res) {
   const client = await companyPool.connect();
   let payrollRun;
   let itemRows = [];
+  let attendanceExceptions = [];
   let totals = { grossSalary: 0, deductions: 0, netSalary: 0 };
   try {
     await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1, $2)", [companyId, 1050505]);
+    const alreadyProcessed = await client.query(`
+      SELECT DISTINCT i.employee_id
+      FROM hrms_payroll_items i
+      JOIN hrms_payroll_runs p ON p.payroll_id = i.payroll_id AND p.company_id = i.company_id
+      WHERE i.company_id = $1 AND i.employee_id = ANY($2::integer[])
+        AND p.status IN ('draft', 'approved', 'paid')
+        AND p.pay_period_start <= $4 AND p.pay_period_end >= $3
+    `, [companyId, employeeIds, payPeriodStart, payPeriodEnd]);
+    if (alreadyProcessed.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "One or more employees already have payroll in an overlapping period",
+        employeeIds: alreadyProcessed.rows.map(({ employee_id }) => employee_id),
+      });
+    }
+
     const employees = await client.query(`
       SELECT employee_id FROM hrms_employees
       WHERE company_id = $1 AND is_deleted = FALSE AND status = 'active'
@@ -622,7 +726,7 @@ export async function createPayrollRun(req, res) {
       return res.status(400).json({ error: "Payroll includes an employee who is not active in this company" });
     }
 
-    const [ruleResult, overtimeResult] = await Promise.all([
+    const [ruleResult, overtimeResult, attendanceResult] = await Promise.all([
       client.query(`
         SELECT rule_code, rule_name, calculation_method, calculation_basis, rate, is_statutory
         FROM hrms_deduction_rules
@@ -630,29 +734,49 @@ export async function createPayrollRun(req, res) {
         ORDER BY rule_id
       `, [companyId]),
       client.query(`
-        SELECT employee_id, hours, hourly_rate
+        SELECT overtime_request_id, employee_id, hours, hourly_rate
         FROM hrms_overtime_requests
         WHERE company_id = $1 AND status = 'approved'
           AND work_date BETWEEN $2 AND $3 AND employee_id = ANY($4::integer[])
-          AND hourly_rate IS NOT NULL
+          AND payroll_id IS NULL
+        ORDER BY overtime_request_id
+        FOR UPDATE
       `, [companyId, payPeriodStart, payPeriodEnd, employeeIds]),
+      client.query(`
+        SELECT employee_id, attendance_date, status, check_in, check_out
+        FROM hrms_attendance
+        WHERE company_id = $1 AND employee_id = ANY($2::integer[])
+          AND attendance_date BETWEEN $3 AND $4
+          AND (status IN ('absent', 'late', 'half_day')
+            OR (status NOT IN ('absent', 'holiday', 'on_leave') AND check_in IS NULL)
+            OR (check_in IS NOT NULL AND check_out IS NULL))
+        ORDER BY employee_id, attendance_date
+      `, [companyId, employeeIds, payPeriodStart, payPeriodEnd]),
     ]);
+    if (overtimeResult.rows.some(({ hourly_rate }) => hourly_rate === null)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Every approved overtime request in this pay period needs an hourly rate before payroll can be generated" });
+    }
+    attendanceExceptions = attendanceResult.rows;
     const overtimeByEmployee = new Map();
+    const overtimeIdsByEmployee = new Map();
     for (const request of overtimeResult.rows) {
       const amount = calculateOvertimePay(request.hours, request.hourly_rate);
       overtimeByEmployee.set(
         request.employee_id,
         Math.round(((overtimeByEmployee.get(request.employee_id) || 0) + amount) * 100) / 100
       );
+      const ids = overtimeIdsByEmployee.get(request.employee_id) || [];
+      ids.push(request.overtime_request_id);
+      overtimeIdsByEmployee.set(request.employee_id, ids);
     }
 
     const preparedItems = items.map((item, index) => {
       const employeeId = employeeIds[index];
-      const suppliedOvertime = Number(item.overtime ?? item.overtimeAmount ?? item.overtime_amount ?? 0);
       const earnings = {
         basicSalary: Number(item.basicSalary ?? item.basic_salary ?? 0),
         allowances: Number(item.allowances ?? item.allowanceAmount ?? item.allowance_amount ?? 0),
-        overtime: suppliedOvertime + (overtimeByEmployee.get(employeeId) || 0),
+        overtime: overtimeByEmployee.get(employeeId) || 0,
         bonus: Number(item.bonus ?? item.bonusAmount ?? item.bonus_amount ?? 0),
         otherEarnings: Number(item.otherEarnings ?? item.other_earnings ?? 0),
         deductions: Number(item.deductions ?? item.deductionAmount ?? item.deduction_amount ?? 0),
@@ -693,6 +817,20 @@ export async function createPayrollRun(req, res) {
     `, [payPeriodStart, payPeriodEnd, totals.grossSalary, totals.deductions, totals.netSalary, userId, companyId]);
     payrollRun = runResult.rows[0];
 
+    const overtimeRequestIds = [...overtimeIdsByEmployee.values()].flat();
+    if (overtimeRequestIds.length) {
+      const claimedOvertime = await client.query(`
+        UPDATE hrms_overtime_requests
+        SET payroll_id = $1, updated_at = NOW()
+        WHERE overtime_request_id = ANY($2::integer[]) AND company_id = $3
+          AND status = 'approved' AND payroll_id IS NULL
+        RETURNING overtime_request_id
+      `, [payrollRun.payroll_id, overtimeRequestIds, companyId]);
+      if (claimedOvertime.rows.length !== overtimeRequestIds.length) {
+        throw Object.assign(new Error("Some approved overtime requests were already claimed by another payroll run"), { status: 409 });
+      }
+    }
+
     for (const item of preparedItems) {
       const { breakdown } = item;
       const result = await client.query(`
@@ -722,6 +860,9 @@ export async function createPayrollRun(req, res) {
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error.status === 409) {
+      return res.status(409).json({ error: error.message });
+    }
     throw error;
   } finally {
     client.release();
@@ -742,7 +883,12 @@ export async function createPayrollRun(req, res) {
     company_id: companyId,
   });
 
-  return res.status(201).json({ message: "Payroll run created", payrollRun, items: itemRows });
+  return res.status(201).json({
+    message: "Payroll run created",
+    payrollRun,
+    items: itemRows,
+    attendanceExceptions,
+  });
 }
 
 export async function approvePayrollRun(req, res) {
@@ -753,13 +899,18 @@ export async function approvePayrollRun(req, res) {
 
   const result = await companyPool.query(`
     UPDATE hrms_payroll_runs
-    SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW()
-    WHERE payroll_id = $2 AND company_id = $3
+    SET status = 'approved', approved_by = $1, approved_at = NOW(), locked_at = NOW(), updated_at = NOW()
+    WHERE payroll_id = $2 AND company_id = $3 AND status = 'draft'
     RETURNING *
   `, [userId, payrollId, companyId]);
 
   if (result.rows.length === 0) {
-    return res.status(404).json({ error: "Payroll run not found" });
+    const existing = await companyPool.query(
+      "SELECT status FROM hrms_payroll_runs WHERE payroll_id = $1 AND company_id = $2",
+      [payrollId, companyId]
+    );
+    if (!existing.rows.length) return res.status(404).json({ error: "Payroll run not found" });
+    return res.status(409).json({ error: `Only draft payroll can be approved; this run is ${existing.rows[0].status}` });
   }
 
   await logAudit(companyPool, {

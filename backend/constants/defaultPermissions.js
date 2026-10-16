@@ -296,13 +296,18 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "hrms_employee:create", moduleName: "HRMS" },
   { permissionName: "hrms_employee:update", moduleName: "HRMS" },
   { permissionName: "hrms_employee:delete", moduleName: "HRMS" },
+  { permissionName: "hrms_employee:private:view", moduleName: "HRMS" },
+  { permissionName: "hrms_employee:private:update", moduleName: "HRMS" },
 
   { permissionName: "hrms_attendance:view", moduleName: "HRMS" },
   { permissionName: "hrms_attendance:create", moduleName: "HRMS" },
+  { permissionName: "hrms_attendance:correction:create", moduleName: "HRMS" },
+  { permissionName: "hrms_attendance:correction:approve", moduleName: "HRMS" },
 
   { permissionName: "hrms_leave:view", moduleName: "HRMS" },
   { permissionName: "hrms_leave:create", moduleName: "HRMS" },
   { permissionName: "hrms_leave:update", moduleName: "HRMS" },
+  { permissionName: "hrms_leave:approve", moduleName: "HRMS" },
 
   { permissionName: "hrms_payroll:view", moduleName: "HRMS" },
   { permissionName: "hrms_payroll:create", moduleName: "HRMS" },
@@ -322,6 +327,24 @@ export const DEFAULT_PERMISSIONS = [
   { permissionName: "hrms_onboarding:create", moduleName: "HRMS" },
   { permissionName: "hrms_onboarding:update", moduleName: "HRMS" },
   { permissionName: "hrms_analytics:view", moduleName: "HRMS" },
+  { permissionName: "hrms_payroll:payment:create", moduleName: "HRMS" },
+  { permissionName: "hrms_payroll:payment:reverse", moduleName: "HRMS" },
+  { permissionName: "hrms_project_assignment:view", moduleName: "HRMS" },
+  { permissionName: "hrms_project_assignment:create", moduleName: "HRMS" },
+  { permissionName: "hrms_project_assignment:update", moduleName: "HRMS" },
+  { permissionName: "hrms_project_timesheet:view", moduleName: "HRMS" },
+  { permissionName: "hrms_project_timesheet:create", moduleName: "HRMS" },
+  { permissionName: "hrms_project_timesheet:approve", moduleName: "HRMS" },
+  { permissionName: "hrms_employee_exit:view", moduleName: "HRMS" },
+  { permissionName: "hrms_employee_exit:create", moduleName: "HRMS" },
+  { permissionName: "hrms_employee_exit:approve", moduleName: "HRMS" },
+  { permissionName: "hrms_training:view", moduleName: "HRMS" },
+  { permissionName: "hrms_training:create", moduleName: "HRMS" },
+  { permissionName: "hrms_training:update", moduleName: "HRMS" },
+  { permissionName: "hrms_appraisal:view", moduleName: "HRMS" },
+  { permissionName: "hrms_appraisal:create", moduleName: "HRMS" },
+  { permissionName: "hrms_appraisal:update", moduleName: "HRMS" },
+  { permissionName: "hrms_appraisal:approve", moduleName: "HRMS" },
 
 
 ];

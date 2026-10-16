@@ -14,6 +14,13 @@ export function computeEquipmentCost({ hours_used, rate_per_hour, fuel_cost }) {
     return Math.round((Number(hours_used) * Number(rate_per_hour) + Number(fuel_cost || 0)) * 100) / 100;
 }
 
+export function computeTimesheetCost({ regular_hours, overtime_hours, rate_per_hour, ot_rate_per_hour }) {
+    return Math.round((
+        Number(regular_hours) * Number(rate_per_hour)
+        + Number(overtime_hours) * Number(ot_rate_per_hour)
+    ) * 100) / 100;
+}
+
 /**
  * Recomputes tbl_project_costs.actual_amount for one category from its source
  * log table, then recomputes tbl_project.actual_cost as the sum across every
@@ -24,9 +31,26 @@ export async function recalcProjectCost(client, { projectId, companyId, category
     const table = { labour: "tbl_project_manpower_log", equipment: "tbl_project_equipment_log" }[category];
     if (!table) throw new Error(`recalcProjectCost: unsupported category '${category}'`);
 
+    const project = await client.query(
+        `SELECT project_id FROM tbl_project
+          WHERE project_id = $1 AND company_id = $2 AND is_deleted = FALSE
+          FOR UPDATE`,
+        [projectId, companyId]
+    );
+    if (!project.rows.length) throw new Error("recalcProjectCost: project not found");
+
     const sum = await client.query(
-        `SELECT COALESCE(SUM(total_cost), 0) AS total FROM ${table}
-          WHERE project_id = $1 AND company_id = $2 AND is_deleted = FALSE`,
+        category === "labour"
+            ? `SELECT COALESCE(SUM(total_cost), 0) AS total
+                 FROM (
+                   SELECT total_cost FROM tbl_project_manpower_log
+                    WHERE project_id = $1 AND company_id = $2 AND is_deleted = FALSE
+                   UNION ALL
+                   SELECT total_cost FROM hrms_project_timesheets
+                    WHERE project_id = $1 AND company_id = $2 AND status = 'approved'
+                 ) AS project_labour_costs`
+            : `SELECT COALESCE(SUM(total_cost), 0) AS total FROM ${table}
+                WHERE project_id = $1 AND company_id = $2 AND is_deleted = FALSE`,
         [projectId, companyId]
     );
     const actual = sum.rows[0].total;

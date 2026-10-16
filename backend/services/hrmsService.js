@@ -6,6 +6,22 @@ export function toNumber(value, fallback = 0) {
   return numericValue;
 }
 
+export function isValidDateOnly(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function isValidTime(value) {
+  return typeof value === "string"
+    && /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
+}
+
+export function canTransitionLeaveStatus(currentStatus, nextStatus) {
+  return (currentStatus === "pending" && ["approved", "rejected", "cancelled"].includes(nextStatus))
+    || (currentStatus === "approved" && nextStatus === "cancelled");
+}
+
 export function calculatePayrollBreakdown(input = {}) {
   const roundMoney = (value) => Math.round(value * 100) / 100;
   const basicSalary = roundMoney(toNumber(input.basicSalary, 0));
